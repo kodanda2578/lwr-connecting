@@ -1,0 +1,27 @@
+# Target / Build artifacts
+target/
+backend/target/
+frontend/dist/
+dist/
+backend/apache-maven-3.9.6/
+*.zip
+
+# Database files
+backend/data/
+*.mv.db
+*.db
+
+# Node dependencies
+node_modules/
+frontend/node_modules/
+
+# Environment and Secrets
+.env
+.env.*
+*.env
+
+# IDE and OS
+.idea/
+.vscode/
+.DS_Store
+*.log
