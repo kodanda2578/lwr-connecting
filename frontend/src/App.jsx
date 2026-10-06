@@ -15,6 +15,8 @@ import { StudentDashboard } from './pages/StudentDashboard';
 import { JeeModule } from './pages/JeeModule';
 import { EapcetModule } from './pages/EapcetModule';
 import { SyllabusPage } from './pages/SyllabusPage';
+import ExamSyllabusPage from './pages/ExamSyllabusPage';
+import PyqExplorerPage from './pages/PyqExplorerPage';
 import { QuestionBankPage } from './pages/QuestionBankPage';
 import { MockTestsPage } from './pages/MockTestsPage';
 import { MockTestEngine } from './pages/MockTestEngine';
@@ -22,11 +24,14 @@ import { TestResultPage } from './pages/TestResultPage';
 import { PreviousPapersPage } from './pages/PreviousPapersPage';
 import { StudyMaterialsPage } from './pages/StudyMaterialsPage';
 import { VideoLibraryPage } from './pages/VideoLibraryPage';
-import { CollegeDiscoveryPage } from './pages/CollegeDiscoveryPage';
-import { CollegeDetailsPage } from './pages/CollegeDetailsPage';
+import StateExamsPage from './pages/StateExamsPage';
+import CollegeDiscoveryPage from './pages/CollegeDiscoveryPage';
+import CollegeDetailsPage from './pages/CollegeDetailsPage';
+import CollegeComparePage from './pages/CollegeComparePage';
+import CutoffExplorerPage from './pages/CutoffExplorerPage';
+import CollegePredictorPage from './pages/CollegePredictorPage';
 import { BranchDirectoryPage } from './pages/BranchDirectoryPage';
 import { RankEstimatorPage } from './pages/RankEstimatorPage';
-import { CollegeComparePage } from './pages/CollegeComparePage';
 import { BTechRoadmapPage } from './pages/BTechRoadmapPage';
 import { AiAssistantPage } from './pages/AiAssistantPage';
 import { DirectMessagingPage } from './pages/DirectMessagingPage';
@@ -53,18 +58,21 @@ export function App() {
               {/* Academic & Guidance Routes */}
               <Route path="/jee" element={<JeeModule />} />
               <Route path="/eapcet" element={<EapcetModule />} />
-              <Route path="/syllabus" element={<SyllabusPage />} />
-              <Route path="/practice" element={<QuestionBankPage />} />
+              <Route path="/syllabus" element={<ExamSyllabusPage />} />
+              <Route path="/exam-syllabus" element={<ExamSyllabusPage />} />
+              <Route path="/pyqs" element={<PyqExplorerPage />} />
+              <Route path="/practice" element={<PyqExplorerPage />} />
               <Route path="/mock-tests" element={<MockTestsPage />} />
               <Route path="/previous-papers" element={<PreviousPapersPage />} />
               <Route path="/study-materials" element={<StudyMaterialsPage />} />
               <Route path="/videos" element={<VideoLibraryPage />} />
-              <Route path="/college-predictor" element={<CollegeDiscoveryPage />} />
+              <Route path="/state-exams" element={<StateExamsPage />} />
               <Route path="/colleges" element={<CollegeDiscoveryPage />} />
               <Route path="/colleges/:id" element={<CollegeDetailsPage />} />
-              <Route path="/branches" element={<BranchDirectoryPage />} />
-              <Route path="/rank-estimator" element={<RankEstimatorPage />} />
+              <Route path="/compare-colleges" element={<CollegeComparePage />} />
               <Route path="/compare" element={<CollegeComparePage />} />
+              <Route path="/cutoffs" element={<CutoffExplorerPage />} />
+              <Route path="/college-predictor" element={<CollegePredictorPage />} />
               <Route path="/btech-roadmap" element={<BTechRoadmapPage />} />
               <Route path="/community" element={<CommunityPage />} />
 
@@ -87,6 +95,14 @@ export function App() {
               />
               <Route 
                 path="/mock-tests/:id/result" 
+                element={
+                  <ProtectedRoute>
+                    <TestResultPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/mock-tests/attempts/:id/result" 
                 element={
                   <ProtectedRoute>
                     <TestResultPage />

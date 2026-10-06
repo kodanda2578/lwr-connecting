@@ -66,8 +66,8 @@ public class AdminController {
 
     @PostMapping("/colleges")
     public ResponseEntity<College> createCollege(@Valid @RequestBody College college) {
-        if (college.getLastUpdated() == null) {
-            college.setLastUpdated(LocalDate.now());
+        if (college.getActive() == null) {
+            college.setActive(true);
         }
         College saved = collegeRepository.save(college);
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);

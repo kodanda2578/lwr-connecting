@@ -49,9 +49,9 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/auth/**", "/api/auth/**", "/admin/auth/**", "/api/admin/auth/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/exams/**", "/colleges/**", "/cutoffs/**", "/branches/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/exams/**", "/api/exams/**", "/subjects/**", "/api/subjects/**", "/topics/**", "/api/topics/**", "/subtopics/**", "/api/subtopics/**", "/questions/**", "/api/questions/**", "/states/**", "/api/states/**", "/colleges/**", "/api/colleges/**", "/cutoffs/**", "/api/cutoffs/**", "/branches/**", "/api/branches/**", "/mock-tests/**", "/api/mock-tests/**").permitAll()
                 .requestMatchers("/college-predictor", "/rank-estimator").permitAll()
-                .requestMatchers("/admin/**").hasRole("ADMIN")
+                .requestMatchers("/admin/**", "/api/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             );
 

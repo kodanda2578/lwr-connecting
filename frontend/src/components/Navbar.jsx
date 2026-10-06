@@ -161,6 +161,71 @@ export const Navbar = () => {
           </Link>
 
           <Link 
+            to="/pyqs" 
+            style={{ 
+              color: isActive('/pyqs') ? '#06b6d4' : '#cbd5e1', 
+              fontWeight: 600, 
+              fontSize: '0.9rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem'
+            }}>
+            <BookOpen size={16} /> PYQ Explorer
+          </Link>
+
+          <Link 
+            to="/exam-syllabus" 
+            style={{ 
+              color: isActive('/exam-syllabus') ? '#06b6d4' : '#cbd5e1', 
+              fontWeight: 600, 
+              fontSize: '0.9rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem'
+            }}>
+            <Compass size={16} /> Syllabus & Weightage
+          </Link>
+
+          <Link 
+            to="/state-exams" 
+            style={{ 
+              color: isActive('/state-exams') ? '#06b6d4' : '#cbd5e1', 
+              fontWeight: 600, 
+              fontSize: '0.9rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem'
+            }}>
+            <Award size={16} /> State Exams
+          </Link>
+
+          <Link 
+            to="/colleges" 
+            style={{ 
+              color: isActive('/colleges') ? '#06b6d4' : '#cbd5e1', 
+              fontWeight: 600, 
+              fontSize: '0.9rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem'
+            }}>
+            <Building2 size={16} /> Colleges
+          </Link>
+
+          <Link 
+            to="/cutoffs" 
+            style={{ 
+              color: isActive('/cutoffs') ? '#06b6d4' : '#cbd5e1', 
+              fontWeight: 600, 
+              fontSize: '0.9rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem'
+            }}>
+            <Compass size={16} /> Cutoffs
+          </Link>
+
+          <Link 
             to="/college-predictor" 
             style={{ 
               color: isActive('/college-predictor') ? '#06b6d4' : '#cbd5e1', 
@@ -170,7 +235,7 @@ export const Navbar = () => {
               alignItems: 'center',
               gap: '0.35rem'
             }}>
-            <Building2 size={16} /> College Predictor
+            <Building2 size={16} /> Predictor
           </Link>
 
           <Link 

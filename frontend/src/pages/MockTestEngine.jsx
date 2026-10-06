@@ -1,28 +1,66 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { MOCK_TESTS_DATA } from '../data/sampleData';
-import { Clock, Bookmark, CheckCircle2, ArrowRight, ArrowLeft, ShieldAlert, Flag } from 'lucide-react';
+import { Clock, CheckCircle2, ArrowRight, ArrowLeft, Flag, Maximize2, Minimize2, AlertTriangle, ShieldAlert, X } from 'lucide-react';
 
 export const MockTestEngine = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const testData = MOCK_TESTS_DATA.find((t) => t.id === id) || MOCK_TESTS_DATA[0];
 
+  const [testData, setTestData] = useState(null);
+  const [attempt, setAttempt] = useState(null);
   const [testStarted, setTestStarted] = useState(false);
   const [currentQIndex, setCurrentQIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const [markedForReview, setMarkedForReview] = useState({});
-  const [timeLeft, setTimeLeft] = useState(testData.durationMinutes * 60);
+  const [questionTimeSpent, setQuestionTimeSpent] = useState({});
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Timer countdown hook
+  // 1. Fetch Test Details
+  useEffect(() => {
+    fetchTestData();
+  }, [id]);
+
+  const fetchTestData = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/mock-tests/${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setTestData(data);
+        setTimeLeft(data.durationMinutes * 60);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 2. Prevent accidental browser close/refresh during test
   useEffect(() => {
     if (!testStarted) return;
+
+    const handleBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = 'Warning: Leaving or refreshing the page will auto-submit your CBT exam!';
+      return e.returnValue;
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [testStarted]);
+
+  // 3. Timer Countdown Hook
+  useEffect(() => {
+    if (!testStarted || timeLeft <= 0) return;
 
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          handleSubmitTest();
+          handleSubmitTest(true); // Auto-submit on 0 timer
           return 0;
         }
         return prev - 1;
@@ -30,7 +68,36 @@ export const MockTestEngine = () => {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [testStarted]);
+  }, [testStarted, timeLeft]);
+
+  // 4. Start CBT Attempt
+  const handleStartCBT = async () => {
+    try {
+      const res = await fetch(`/api/mock-tests/${id}/start`, { method: 'POST' });
+      if (res.ok) {
+        const attemptData = await res.json();
+        setAttempt(attemptData);
+        setTestStarted(true);
+      } else {
+        alert('Please log in to take mock tests');
+        navigate('/login');
+      }
+    } catch (err) {
+      alert('Failed to connect to test server.');
+    }
+  };
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+      setIsFullscreen(true);
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+        setIsFullscreen(false);
+      }
+    }
+  };
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -39,11 +106,23 @@ export const MockTestEngine = () => {
   };
 
   const handleSelectOption = (letter) => {
+    if (!testData || !testData.questions) return;
     const currentQ = testData.questions[currentQIndex];
     setAnswers((prev) => ({ ...prev, [currentQ.id]: letter }));
   };
 
+  const handleClearAnswer = () => {
+    if (!testData || !testData.questions) return;
+    const currentQ = testData.questions[currentQIndex];
+    setAnswers((prev) => {
+      const updated = { ...prev };
+      delete updated[currentQ.id];
+      return updated;
+    });
+  };
+
   const toggleMarkForReview = () => {
+    if (!testData || !testData.questions) return;
     const currentQ = testData.questions[currentQIndex];
     setMarkedForReview((prev) => ({
       ...prev,
@@ -51,74 +130,88 @@ export const MockTestEngine = () => {
     }));
   };
 
-  const handleSubmitTest = () => {
-    // Evaluate test results
-    let correctCount = 0;
-    let wrongCount = 0;
-    let attemptedCount = 0;
+  const handleSubmitTest = async (isAutoSubmit = false) => {
+    if (!attempt || !testData) return;
 
-    testData.questions.forEach((q) => {
-      const selected = answers[q.id];
-      if (selected) {
-        attemptedCount++;
-        if (selected === q.correctOption) {
-          correctCount++;
-        } else {
-          wrongCount++;
-        }
-      }
-    });
-
-    // Score calculation (AP EAPCET +1, 0 neg; JEE +4, -1 neg)
-    let totalScore = 0;
-    if (testData.exam === 'AP_EAPCET') {
-      totalScore = correctCount * 1;
-    } else {
-      totalScore = correctCount * 4 - wrongCount * 1;
+    if (!isAutoSubmit) {
+      const confirmSubmit = window.confirm('Are you sure you want to submit your CBT exam now?');
+      if (!confirmSubmit) return;
     }
 
-    const accuracy = attemptedCount > 0 ? Math.round((correctCount / attemptedCount) * 100) : 0;
+    const answersList = testData.questions.map((q) => ({
+      questionId: q.id,
+      selectedOption: answers[q.id] || null,
+      timeSpentSeconds: questionTimeSpent[q.id] || 0,
+      markedForReview: Boolean(markedForReview[q.id])
+    }));
 
-    const resultPayload = {
-      testId: testData.id,
-      title: testData.title,
-      totalScore,
-      totalMarks: testData.totalMarks,
-      accuracy,
-      attemptedCount,
-      correctCount,
-      wrongCount,
-      unansweredCount: testData.questions.length - attemptedCount,
-      timeSpentMinutes: Math.round((testData.durationMinutes * 60 - timeLeft) / 60)
-    };
+    const totalTimeSpentSeconds = (testData.durationMinutes * 60) - timeLeft;
 
-    localStorage.setItem(`lwr_test_result_${testData.id}`, JSON.stringify(resultPayload));
-    navigate(`/mock-tests/${testData.id}/result`);
+    try {
+      const res = await fetch('/api/mock-tests/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          attemptId: attempt.id,
+          totalTimeSpentSeconds,
+          answers: answersList
+        })
+      });
+
+      if (res.ok) {
+        const resultPayload = await res.json();
+        navigate(`/mock-tests/attempts/${attempt.id}/result`, { state: { resultPayload } });
+      } else {
+        alert('Failed to evaluate test submission.');
+      }
+    } catch (e) {
+      alert('Network error while submitting test.');
+    }
   };
 
-  const currentQ = testData.questions[currentQIndex];
+  if (loading || !testData) {
+    return (
+      <div style={{ padding: '5rem 0', textAlign: 'center', color: '#94a3b8' }}>
+        Loading Computer Based Test environment...
+      </div>
+    );
+  }
 
-  // If test hasn't started, render Instructions Screen
+  const currentQ = testData.questions ? testData.questions[currentQIndex] : null;
+
+  // Render Instructions Screen before test start
   if (!testStarted) {
     return (
       <div style={{ padding: '3rem 0', minHeight: 'calc(100vh - 80px)' }}>
-        <div className="container" style={{ maxWidth: '750px' }}>
-          <div className="glass-panel" style={{ padding: '2.5rem' }}>
+        <div className="container" style={{ maxWidth: '780px' }}>
+          <div className="glass-panel" style={{ padding: '2.5rem', borderColor: 'rgba(6,182,212,0.4)' }}>
+            <div className="badge badge-cyan" style={{ marginBottom: '0.75rem' }}>Computer Based Test (CBT) Interface</div>
             <h2 style={{ fontSize: '1.8rem', color: '#ffffff', marginBottom: '0.5rem' }}>
-              Test Instructions: {testData.title}
+              {testData.title}
             </h2>
             <p style={{ color: '#06b6d4', fontSize: '0.9rem', marginBottom: '1.5rem', fontWeight: 600 }}>
-              Duration: {testData.durationMinutes} Mins | Total Marks: {testData.totalMarks} | Exam: {testData.exam}
+              Exam: {testData.examName} | Duration: {testData.durationMinutes} Mins | Total Questions: {testData.totalQuestions} | Total Marks: {testData.totalMarks}
             </p>
 
             <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '1.5rem', marginBottom: '2rem' }}>
-              <h4 style={{ color: '#ffffff', marginBottom: '1rem' }}>Please read the instructions carefully:</h4>
+              <h4 style={{ color: '#ffffff', marginBottom: '1rem' }}>CBT Instructions & Marking Rules:</h4>
               <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.9rem', color: '#cbd5e1' }}>
-                {testData.instructions.map((inst, i) => (
-                  <li key={i} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
-                    <span style={{ color: '#06b6d4', fontWeight: 700 }}>•</span> {inst}
-                  </li>
-                ))}
+                <li style={{ display: 'flex', gap: '0.5rem' }}>
+                  <span style={{ color: '#06b6d4', fontWeight: 700 }}>•</span>
+                  <span><strong>Correct Answer:</strong> +{currentQ?.marks || 4} Marks</span>
+                </li>
+                <li style={{ display: 'flex', gap: '0.5rem' }}>
+                  <span style={{ color: '#ef4444', fontWeight: 700 }}>•</span>
+                  <span><strong>Incorrect Answer:</strong> {testData.negativeMarking ? `-${currentQ?.negativeMarks || 1} Negative Mark` : '0 Negative Marks'}</span>
+                </li>
+                <li style={{ display: 'flex', gap: '0.5rem' }}>
+                  <span style={{ color: '#f59e0b', fontWeight: 700 }}>•</span>
+                  <span><strong>Auto-Submit:</strong> When timer reaches 00:00, your exam will be automatically submitted and evaluated.</span>
+                </li>
+                <li style={{ display: 'flex', gap: '0.5rem' }}>
+                  <span style={{ color: '#10b981', fontWeight: 700 }}>•</span>
+                  <span><strong>Anti-Cheating Control:</strong> Do not refresh or switch tabs during the live test session.</span>
+                </li>
               </ul>
             </div>
 
@@ -126,8 +219,8 @@ export const MockTestEngine = () => {
               <button onClick={() => navigate('/mock-tests')} className="btn-secondary" style={{ padding: '0.8rem 1.5rem' }}>
                 Cancel
               </button>
-              <button onClick={() => setTestStarted(true)} className="btn-primary" style={{ flex: 1, justifyContent: 'center', padding: '0.8rem' }}>
-                I Am Ready — Start Test <ArrowRight size={18} />
+              <button onClick={handleStartCBT} className="btn-primary" style={{ flex: 1, justifyContent: 'center', padding: '0.85rem' }}>
+                I Am Ready — Start Online Test <ArrowRight size={18} />
               </button>
             </div>
           </div>
@@ -136,7 +229,7 @@ export const MockTestEngine = () => {
     );
   }
 
-  // Render Fullscreen CBT Test Engine
+  // Render Full CBT Test Engine
   return (
     <div style={{ background: '#04070f', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       
@@ -144,23 +237,31 @@ export const MockTestEngine = () => {
       <header style={{
         background: '#090d1a',
         borderBottom: '1px solid rgba(255,255,255,0.1)',
-        padding: '1rem 2rem',
+        padding: '0.85rem 2rem',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center'
       }}>
         <div>
           <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#ffffff' }}>{testData.title}</div>
-          <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Subject: {currentQ?.subject} | Chapter: {currentQ?.chapter}</div>
+          <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+            Subject: {currentQ?.subjectName} {currentQ?.topicName ? `| ${currentQ.topicName}` : ''}
+          </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+          <button 
+            onClick={toggleFullscreen} 
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#ffffff', padding: '0.5rem 0.85rem', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem' }}>
+            {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />} {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen CBT'}
+          </button>
+
           <div style={{
-            background: 'rgba(6, 182, 212, 0.15)',
-            border: '1px solid #06b6d4',
+            background: timeLeft < 300 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(6, 182, 212, 0.15)',
+            border: timeLeft < 300 ? '1px solid #ef4444' : '1px solid #06b6d4',
             padding: '0.5rem 1.25rem',
             borderRadius: '8px',
-            color: '#06b6d4',
+            color: timeLeft < 300 ? '#f87171' : '#06b6d4',
             fontWeight: 800,
             fontSize: '1.1rem',
             display: 'flex',
@@ -170,8 +271,8 @@ export const MockTestEngine = () => {
             <Clock size={20} /> {formatTime(timeLeft)}
           </div>
 
-          <button onClick={handleSubmitTest} className="btn-accent" style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem' }}>
-            Submit Test
+          <button onClick={() => handleSubmitTest(false)} className="btn-accent" style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem' }}>
+            Submit Exam
           </button>
         </div>
       </header>
@@ -179,37 +280,60 @@ export const MockTestEngine = () => {
       {/* CBT Body */}
       <div style={{ flex: 1, display: 'flex' }}>
         
-        {/* Left Question Area */}
+        {/* Left Main Question Canvas */}
         <div style={{ flex: 1, padding: '2.5rem', overflowY: 'auto' }}>
           
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-            <span className="badge badge-cyan" style={{ fontSize: '0.85rem' }}>Question {currentQIndex + 1} of {testData.questions.length}</span>
-            <button 
-              onClick={toggleMarkForReview}
-              style={{
-                background: markedForReview[currentQ.id] ? 'rgba(245, 158, 11, 0.2)' : 'transparent',
-                border: markedForReview[currentQ.id] ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.1)',
-                color: markedForReview[currentQ.id] ? '#f59e0b' : '#94a3b8',
-                padding: '0.4rem 0.8rem',
-                borderRadius: '6px',
-                fontSize: '0.8rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.35rem'
-              }}>
-              <Flag size={14} /> {markedForReview[currentQ.id] ? 'Marked for Review' : 'Mark for Review'}
-            </button>
+            <span className="badge badge-cyan" style={{ fontSize: '0.85rem' }}>
+              Question {currentQIndex + 1} of {testData.questions.length}
+            </span>
+
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              {answers[currentQ?.id] && (
+                <button 
+                  onClick={handleClearAnswer}
+                  style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid #ef4444', color: '#f87171', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <X size={14} /> Clear Choice
+                </button>
+              )}
+
+              <button 
+                onClick={toggleMarkForReview}
+                style={{
+                  background: markedForReview[currentQ?.id] ? 'rgba(245, 158, 11, 0.2)' : 'transparent',
+                  border: markedForReview[currentQ?.id] ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.1)',
+                  color: markedForReview[currentQ?.id] ? '#f59e0b' : '#94a3b8',
+                  padding: '0.4rem 0.8rem',
+                  borderRadius: '6px',
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem'
+                }}>
+                <Flag size={14} /> {markedForReview[currentQ?.id] ? 'Marked for Review' : 'Mark for Review'}
+              </button>
+            </div>
           </div>
 
           <div style={{ fontSize: '1.15rem', color: '#ffffff', fontWeight: 600, marginBottom: '2rem', lineHeight: '1.6' }}>
-            {currentQ.questionText}
+            {currentQ?.questionText}
           </div>
 
-          {/* Options */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', maxWidth: '700px', marginBottom: '3rem' }}>
-            {currentQ.options.map((opt) => {
-              const isSelected = answers[currentQ.id] === opt.letter;
+          {currentQ?.imageUrl && (
+            <img src={currentQ.imageUrl} alt="Question diagram" style={{ maxWidth: '100%', maxHeight: '250px', borderRadius: '8px', marginBottom: '1.5rem' }} />
+          )}
+
+          {/* Options List */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', maxWidth: '750px', marginBottom: '3rem' }}>
+            {[
+              { letter: 'A', text: currentQ?.optionA },
+              { letter: 'B', text: currentQ?.optionB },
+              { letter: 'C', text: currentQ?.optionC },
+              { letter: 'D', text: currentQ?.optionD }
+            ].map((opt) => {
+              if (!opt.text) return null;
+              const isSelected = answers[currentQ?.id] === opt.letter;
               return (
                 <button
                   key={opt.letter}
@@ -229,8 +353,8 @@ export const MockTestEngine = () => {
                     fontWeight: isSelected ? 700 : 500
                   }}>
                   <span style={{
-                    width: '28px',
-                    height: '28px',
+                    width: '30px',
+                    height: '30px',
                     borderRadius: '50%',
                     background: isSelected ? '#06b6d4' : 'rgba(255,255,255,0.08)',
                     color: isSelected ? '#ffffff' : '#94a3b8',
@@ -248,7 +372,7 @@ export const MockTestEngine = () => {
             })}
           </div>
 
-          {/* Navigation Controls */}
+          {/* Bottom Action Control Buttons */}
           <div style={{ display: 'flex', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem', justifyContent: 'space-between' }}>
             <button 
               type="button"
@@ -269,7 +393,7 @@ export const MockTestEngine = () => {
             ) : (
               <button 
                 type="button"
-                onClick={handleSubmitTest}
+                onClick={() => handleSubmitTest(false)}
                 className="btn-accent">
                 Save & Submit Test <CheckCircle2 size={16} />
               </button>
@@ -278,7 +402,7 @@ export const MockTestEngine = () => {
 
         </div>
 
-        {/* Right Question Palette Matrix */}
+        {/* Right Side Question Palette Matrix */}
         <div style={{
           width: '320px',
           background: '#070b18',
@@ -287,7 +411,7 @@ export const MockTestEngine = () => {
           display: 'flex',
           flexDirection: 'column'
         }}>
-          <h4 style={{ color: '#ffffff', marginBottom: '1rem', fontSize: '0.95rem' }}>Question Navigator</h4>
+          <h4 style={{ color: '#ffffff', marginBottom: '1rem', fontSize: '0.95rem' }}>Question Palette Matrix</h4>
           
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.6rem', marginBottom: '2rem' }}>
             {testData.questions.map((q, idx) => {
@@ -330,13 +454,13 @@ export const MockTestEngine = () => {
 
           <div style={{ marginTop: 'auto', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '1rem', fontSize: '0.75rem', color: '#94a3b8', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: '#10b981' }}></span> Answered
+              <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: '#10b981' }}></span> Answered ({Object.keys(answers).length})
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: '#f59e0b' }}></span> Marked for Review
+              <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: '#f59e0b' }}></span> Marked for Review ({Object.values(markedForReview).filter(Boolean).length})
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: '#1e293b' }}></span> Not Visited
+              <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: '#1e293b' }}></span> Not Visited ({testData.questions.length - Object.keys(answers).length})
             </div>
           </div>
         </div>

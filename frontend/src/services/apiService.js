@@ -124,5 +124,211 @@ export const apiService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt, history })
     }, payload);
+  },
+
+  // Exam Content System APIs
+  getExams: async (type = '') => {
+    const url = type ? `/exams?type=${encodeURIComponent(type)}` : '/exams';
+    return safeFetch(url, { method: 'GET' }, []);
+  },
+
+  getStates: async () => {
+    return safeFetch('/states', { method: 'GET' }, []);
+  },
+
+  getSubjects: async () => {
+    return safeFetch('/subjects', { method: 'GET' }, []);
+  },
+
+  getTopics: async (subjectId = '', examId = '') => {
+    const params = new URLSearchParams();
+    if (subjectId) params.append('subjectId', subjectId);
+    if (examId) params.append('examId', examId);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return safeFetch(`/topics${query}`, { method: 'GET' }, []);
+  },
+
+  getSubTopics: async (topicId = '') => {
+    const query = topicId ? `?topicId=${topicId}` : '';
+    return safeFetch(`/subtopics${query}`, { method: 'GET' }, []);
+  },
+
+  getExamYears: async (examId) => {
+    return safeFetch(`/exams/${examId}/years`, { method: 'GET' }, []);
+  },
+
+  getQuestions: async (filters = {}) => {
+    const params = new URLSearchParams();
+    Object.keys(filters).forEach(key => {
+      if (filters[key] !== null && filters[key] !== undefined && filters[key] !== '') {
+        params.append(key, filters[key]);
+      }
+    });
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return safeFetch(`/questions${query}`, { method: 'GET' }, []);
+  },
+
+  getQuestionById: async (id) => {
+    return safeFetch(`/questions/${id}`, { method: 'GET' }, null);
+  },
+
+  // Admin CRUD APIs
+  adminCreateQuestion: async (questionData) => {
+    return safeFetch('/admin/questions', {
+      method: 'POST',
+      body: JSON.stringify(questionData)
+    }, null);
+  },
+
+  adminUpdateQuestion: async (id, questionData) => {
+    return safeFetch(`/admin/questions/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(questionData)
+    }, null);
+  },
+
+  adminDeleteQuestion: async (id) => {
+    return safeFetch(`/admin/questions/${id}`, {
+      method: 'DELETE'
+    }, null);
+  },
+
+  adminCreateTopic: async (topicData) => {
+    return safeFetch('/admin/topics', {
+      method: 'POST',
+      body: JSON.stringify(topicData)
+    }, null);
+  },
+
+  adminUpdateTopic: async (id, topicData) => {
+    return safeFetch(`/admin/topics/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(topicData)
+    }, null);
+  },
+
+  adminDeleteTopic: async (id) => {
+    return safeFetch(`/admin/topics/${id}`, {
+      method: 'DELETE'
+    }, null);
+  },
+
+  adminCreateExam: async (examData) => {
+    return safeFetch('/admin/exams', {
+      method: 'POST',
+      body: JSON.stringify(examData)
+    }, null);
+  },
+
+  // --- College Discovery & Predictor APIs ---
+  getCollegesList: async (filters = {}) => {
+    const params = new URLSearchParams();
+    Object.keys(filters).forEach(key => {
+      if (filters[key] !== null && filters[key] !== undefined && filters[key] !== '') {
+        params.append(key, filters[key]);
+      }
+    });
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return safeFetch(`/colleges${query}`, { method: 'GET' }, COLLEGES_DATA);
+  },
+
+  getCollegeDetails: async (id) => {
+    return safeFetch(`/colleges/${id}`, { method: 'GET' }, null);
+  },
+
+  getCollegeBranches: async (id) => {
+    return safeFetch(`/colleges/${id}/branches`, { method: 'GET' }, []);
+  },
+
+  getCollegeCutoffs: async (id) => {
+    return safeFetch(`/colleges/${id}/cutoffs`, { method: 'GET' }, []);
+  },
+
+  getBranchesList: async () => {
+    return safeFetch('/branches', { method: 'GET' }, BRANCHES_DATA);
+  },
+
+  getCutoffsList: async (filters = {}) => {
+    const params = new URLSearchParams();
+    Object.keys(filters).forEach(key => {
+      if (filters[key] !== null && filters[key] !== undefined && filters[key] !== '') {
+        params.append(key, filters[key]);
+      }
+    });
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return safeFetch(`/cutoffs${query}`, { method: 'GET' }, CUTOFFS_DATA);
+  },
+
+  predictCollegesList: async (examId, rank, category = '', branchId = '') => {
+    const params = new URLSearchParams({ examId, rank });
+    if (category) params.append('category', category);
+    if (branchId) params.append('branchId', branchId);
+    return safeFetch(`/cutoffs/predict?${params.toString()}`, { method: 'GET' }, []);
+  },
+
+  // --- Admin College & Cutoff Manager APIs ---
+  adminGetColleges: async () => {
+    return safeFetch('/admin/colleges', { method: 'GET' }, []);
+  },
+
+  adminCreateCollege: async (data) => {
+    return safeFetch('/admin/colleges', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }, null);
+  },
+
+  adminUpdateCollege: async (id, data) => {
+    return safeFetch(`/admin/colleges/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    }, null);
+  },
+
+  adminDeleteCollege: async (id) => {
+    return safeFetch(`/admin/colleges/${id}`, {
+      method: 'DELETE'
+    }, null);
+  },
+
+  adminCreateBranch: async (data) => {
+    return safeFetch('/admin/branches', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }, null);
+  },
+
+  adminMapCollegeExam: async (collegeId, examId, notes = '') => {
+    const query = notes ? `?notes=${encodeURIComponent(notes)}` : '';
+    return safeFetch(`/admin/colleges/${collegeId}/map-exam/${examId}${query}`, {
+      method: 'POST'
+    }, null);
+  },
+
+  adminMapCollegeBranch: async (collegeId, branchId, intake = 60) => {
+    const query = intake ? `?intake=${intake}` : '';
+    return safeFetch(`/admin/colleges/${collegeId}/map-branch/${branchId}${query}`, {
+      method: 'POST'
+    }, null);
+  },
+
+  adminCreateCutoff: async (data) => {
+    return safeFetch('/admin/cutoffs', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }, null);
+  },
+
+  adminUpdateCutoff: async (id, data) => {
+    return safeFetch(`/admin/cutoffs/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    }, null);
+  },
+
+  adminDeleteCutoff: async (id) => {
+    return safeFetch(`/admin/cutoffs/${id}`, {
+      method: 'DELETE'
+    }, null);
   }
 };

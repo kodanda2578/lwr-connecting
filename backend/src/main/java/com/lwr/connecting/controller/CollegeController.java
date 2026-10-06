@@ -26,7 +26,7 @@ public class CollegeController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<College> getCollegeById(@PathVariable Integer id) {
+    public ResponseEntity<College> getCollegeById(@PathVariable Long id) {
         return collegeRepository.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());

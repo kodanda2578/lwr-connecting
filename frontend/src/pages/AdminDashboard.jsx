@@ -21,6 +21,9 @@ import {
   UserCheck
 } from 'lucide-react';
 import { COLLEGES_DATA, CUTOFFS_DATA, MOCK_TESTS_DATA } from '../data/sampleData';
+import AdminQuestionManager from '../components/AdminQuestionManager';
+import AdminCollegeManager from '../components/AdminCollegeManager';
+import AdminTestManager from '../components/AdminTestManager';
 
 export const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -168,6 +171,7 @@ export const AdminDashboard = () => {
         <div style={{ display: 'flex', gap: '0.6rem', overflowX: 'auto', paddingBottom: '0.75rem', marginBottom: '2rem' }}>
           {[
             { id: 'overview', label: 'Overview', icon: BarChart3 },
+            { id: 'examContent', label: 'Question & Exam Manager', icon: BookOpen },
             { id: 'mentorInbox', label: 'Mentor Inbox', icon: Inbox, badge: mentorRequests.filter(r => r.status === 'OPEN').length },
             { id: 'composer', label: 'Notification Composer', icon: Bell },
             { id: 'colleges', label: 'Colleges & Cutoffs', icon: Building2 },
@@ -211,6 +215,11 @@ export const AdminDashboard = () => {
             );
           })}
         </div>
+
+        {/* TAB 0: EXAM CONTENT MANAGER */}
+        {activeTab === 'examContent' && (
+          <AdminQuestionManager />
+        )}
 
         {/* TAB 1: OVERVIEW */}
         {activeTab === 'overview' && (
@@ -427,68 +436,13 @@ export const AdminDashboard = () => {
 
         {/* TAB 4: COLLEGES MANAGER */}
         {activeTab === 'colleges' && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h2 style={{ color: '#ffffff', fontSize: '1.4rem' }}>College & Branch Database Manager</h2>
-              <button onClick={() => setShowAddCollegeModal(true)} className="btn-primary">
-                <Plus size={16} /> Add New College
-              </button>
-            </div>
-
-            {/* Add College Modal */}
-            {showAddCollegeModal && (
-              <div className="glass-panel" style={{ padding: '2rem', marginBottom: '2rem', borderColor: 'rgba(6,182,212,0.4)' }}>
-                <h3 style={{ color: '#ffffff', marginBottom: '1rem' }}>Add College Profile</h3>
-                <form onSubmit={handleAddCollege}>
-                  <div className="grid-3">
-                    <div className="form-group">
-                      <label>College Full Name</label>
-                      <input type="text" className="form-control" placeholder="e.g. RVR & JC College of Engineering" value={newCollegeName} onChange={(e) => setNewCollegeName(e.target.value)} required />
-                    </div>
-                    <div className="form-group">
-                      <label>College Code</label>
-                      <input type="text" className="form-control" placeholder="e.g. RVRJ" value={newCollegeCode} onChange={(e) => setNewCollegeCode(e.target.value)} required />
-                    </div>
-                    <div className="form-group">
-                      <label>City</label>
-                      <input type="text" className="form-control" placeholder="e.g. Guntur" value={newCollegeCity} onChange={(e) => setNewCollegeCity(e.target.value)} required />
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                    <button type="button" onClick={() => setShowAddCollegeModal(false)} className="btn-secondary">Cancel</button>
-                    <button type="submit" className="btn-primary">Save College</button>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            <div className="glass-panel" style={{ overflowX: 'auto', padding: 0 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', color: '#f8fafc', fontSize: '0.9rem' }}>
-                <thead>
-                  <tr style={{ background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                    <th style={{ padding: '1rem', textAlign: 'left' }}>Code</th>
-                    <th style={{ padding: '1rem', textAlign: 'left' }}>College Name</th>
-                    <th style={{ padding: '1rem', textAlign: 'left' }}>Location</th>
-                    <th style={{ padding: '1rem', textAlign: 'left' }}>Type</th>
-                    <th style={{ padding: '1rem', textAlign: 'left' }}>Fees</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {colleges.map(c => (
-                    <tr key={c.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                      <td style={{ padding: '0.85rem 1rem', color: '#06b6d4', fontWeight: 700 }}>{c.code}</td>
-                      <td style={{ padding: '0.85rem 1rem', fontWeight: 600 }}>{c.name}</td>
-                      <td style={{ padding: '0.85rem 1rem', color: '#94a3b8' }}>{c.location}</td>
-                      <td style={{ padding: '0.85rem 1rem' }}><span className="badge badge-purple">{c.type}</span></td>
-                      <td style={{ padding: '0.85rem 1rem', color: '#10b981' }}>{c.feesPerYear}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <AdminCollegeManager />
         )}
 
+        {/* TAB 5: MOCK TEST ENGINE PUBLISHER */}
+        {activeTab === 'tests' && (
+          <AdminTestManager />
+        )}
       </div>
     </div>
   );
