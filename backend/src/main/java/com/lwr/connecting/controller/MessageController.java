@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 @RestController
-@RequestMapping("/messages")
+@RequestMapping({"/messages", "/api/messages"})
 public class MessageController {
 
     @Autowired
@@ -64,6 +64,15 @@ public class MessageController {
 
         User sender = userRepository.findByEmail(authentication.getName()).orElseThrow();
         boolean isSenderAdmin = sender.getRoles().stream().anyMatch(r -> r.getName().equals("ROLE_ADMIN"));
+
+        if (!isSenderAdmin) {
+            if (sender.getProfile() != null && Boolean.TRUE.equals(sender.getProfile().getIsMinor())
+                    && !Boolean.TRUE.equals(sender.getProfile().getGuardianConsentGiven())) {
+                Map<String, String> err = new HashMap<>();
+                err.put("error", "Guardian consent is required for minors to access direct messaging.");
+                return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN).body(err);
+            }
+        }
 
         User receiver;
         if (isSenderAdmin) {

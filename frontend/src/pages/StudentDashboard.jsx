@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { apiService } from '../services/apiService';
 import { 
   Sparkles, 
   BookOpen, 
@@ -14,12 +15,37 @@ import {
   Award,
   Clock,
   TrendingUp,
-  MessageSquare
+  MessageSquare,
+  Calendar,
+  Video,
+  UserCheck,
+  MessageSquarePlus
 } from 'lucide-react';
+import { BetaFeedbackModal } from '../components/BetaFeedbackModal';
 
 export const StudentDashboard = () => {
   const { user, savedResources } = useAuth();
   const profile = user?.profile || {};
+
+  const [guidanceRequests, setGuidanceRequests] = useState([]);
+  const [loadingGuidance, setLoadingGuidance] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+
+  useEffect(() => {
+    loadGuidance();
+  }, []);
+
+  const loadGuidance = async () => {
+    setLoadingGuidance(true);
+    try {
+      const res = await apiService.getMyGuidanceRequests();
+      setGuidanceRequests(Array.isArray(res) ? res : []);
+    } catch (e) {
+      console.error('Failed to load student guidance requests:', e);
+    } finally {
+      setLoadingGuidance(false);
+    }
+  };
 
   return (
     <div style={{ padding: '2.5rem 0 5rem 0' }}>
@@ -44,9 +70,20 @@ export const StudentDashboard = () => {
               </p>
             </div>
 
-            <Link to="/ai-assistant" className="btn-accent" style={{ padding: '0.75rem 1.5rem', fontSize: '0.9rem' }}>
-              <Sparkles size={18} /> Ask LWR AI Guidance
-            </Link>
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <button 
+                type="button"
+                onClick={() => setShowFeedbackModal(true)} 
+                className="btn-secondary" 
+                style={{ padding: '0.75rem 1.25rem', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem', borderColor: 'rgba(139, 92, 246, 0.4)', background: 'rgba(139, 92, 246, 0.12)', color: '#c4b5fd' }}
+              >
+                <MessageSquarePlus size={18} color="#a78bfa" /> Beta Feedback
+              </button>
+
+              <Link to="/ai-assistant" className="btn-accent" style={{ padding: '0.75rem 1.5rem', fontSize: '0.9rem' }}>
+                <Sparkles size={18} /> Ask LWR AI Guidance
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -218,6 +255,142 @@ export const StudentDashboard = () => {
 
         </div>
 
+        {/* 1-ON-1 GUIDANCE APPOINTMENTS WITH RAMESH */}
+        <div className="glass-panel" style={{ padding: '2rem', marginTop: '2.5rem', borderColor: 'rgba(6, 182, 212, 0.35)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <h3 style={{ color: '#ffffff', fontSize: '1.25rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <UserCheck size={22} color="#06b6d4" /> My Guidance Appointments with Ramesh
+              </h3>
+              <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: '0.25rem 0 0 0' }}>
+                Track personal mentoring requests, scheduled Google Meet consultations, and session updates.
+              </p>
+            </div>
+            <Link to="/doubt-sessions" className="btn-accent" style={{ padding: '0.5rem 1.15rem', fontSize: '0.825rem' }}>
+              <Sparkles size={15} /> Book 1-on-1 Guidance
+            </Link>
+          </div>
+
+          {loadingGuidance ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
+              Loading guidance appointments...
+            </div>
+          ) : guidanceRequests.length === 0 ? (
+            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1.5rem', borderRadius: '10px', textAlign: 'center', border: '1px dashed rgba(255,255,255,0.1)' }}>
+              <div style={{ color: '#cbd5e1', fontSize: '0.95rem', fontWeight: 600, marginBottom: '0.35rem' }}>
+                No Active Guidance Requests
+              </div>
+              <p style={{ color: '#94a3b8', fontSize: '0.825rem', maxWidth: '500px', margin: '0 auto 1rem auto' }}>
+                Have questions about your AP EAPCET / JEE rank, cutoffs, or which college/branch to prioritize? Request a 1-on-1 guidance consultation with Ramesh.
+              </p>
+              <Link to="/doubt-sessions" className="btn-primary" style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}>
+                Request Session with Ramesh
+              </Link>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {guidanceRequests.map((req) => {
+                const appt = req.appointment;
+                const isScheduled = req.status === 'SCHEDULED' || req.status === 'RESCHEDULED' || (appt && appt.status === 'CONFIRMED');
+                const isRescheduled = req.status === 'RESCHEDULED' || (appt && appt.status === 'RESCHEDULED');
+                const isCancelled = req.status === 'CANCELLED';
+
+                return (
+                  <div key={req.id} style={{
+                    background: 'rgba(15, 23, 42, 0.75)',
+                    border: `1px solid ${isScheduled ? 'rgba(16, 185, 129, 0.4)' : isCancelled ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255,255,255,0.08)'}`,
+                    borderRadius: '10px',
+                    padding: '1.25rem 1.5rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.75rem'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                          <span style={{ fontWeight: 700, color: '#ffffff', fontSize: '0.95rem' }}>
+                            {req.subjectCategory || 'B.Tech Guidance'}
+                          </span>
+                          <span className="badge badge-gray" style={{ fontSize: '0.7rem' }}>
+                            Req #{req.requestId || req.id}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                          Target Exam: <strong style={{ color: '#cbd5e1' }}>{req.targetExam}</strong> • Class: <strong style={{ color: '#cbd5e1' }}>{req.educationLevel}</strong>
+                        </div>
+                      </div>
+
+                      <div>
+                        {isCancelled ? (
+                          <span className="badge badge-red" style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#f87171' }}>
+                            Cancelled
+                          </span>
+                        ) : isScheduled ? (
+                          <span className="badge badge-green" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#34d399' }}>
+                            {isRescheduled ? '🔄 Rescheduled & Confirmed' : '✅ Scheduled & Confirmed'}
+                          </span>
+                        ) : (
+                          <span className="badge badge-amber" style={{ background: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24' }}>
+                            ⏳ Awaiting Mentor Review
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ fontSize: '0.825rem', color: '#cbd5e1', lineHeight: 1.5 }}>
+                      {req.doubtDescription}
+                    </div>
+
+                    {/* Appointment Box when Scheduled */}
+                    {appt && (
+                      <div style={{
+                        background: 'rgba(16, 185, 129, 0.08)',
+                        border: '1px solid rgba(16, 185, 129, 0.25)',
+                        borderRadius: '8px',
+                        padding: '0.85rem 1rem',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: '0.75rem'
+                      }}>
+                        <div>
+                          <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#34d399', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.2rem' }}>
+                            <Calendar size={14} /> Confirmed Session: {appt.scheduledDate} at {appt.scheduledTime} ({appt.timeZone || 'IST'})
+                          </div>
+                          <div style={{ fontSize: '0.775rem', color: '#94a3b8' }}>
+                            Duration: {appt.durationMinutes || 30} mins • Contact Mode: {appt.contactMethod || 'Google Meet'}
+                          </div>
+                        </div>
+
+                        {appt.meetingDetails && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            {appt.meetingDetails.startsWith('http') ? (
+                              <a
+                                href={appt.meetingDetails}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="btn-primary"
+                                style={{ padding: '0.4rem 0.9rem', fontSize: '0.8rem', gap: '0.35rem' }}
+                              >
+                                <Video size={14} /> Join Google Meet
+                              </a>
+                            ) : (
+                              <span style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>
+                                Details: <strong>{appt.meetingDetails}</strong>
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         {/* STUDENT EMAIL PREFERENCES SECTION (SECTION 18) */}
         <div className="glass-panel" style={{ padding: '2rem', marginTop: '2.5rem' }}>
           <h3 style={{ color: '#ffffff', fontSize: '1.2rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -253,6 +426,12 @@ export const StudentDashboard = () => {
             </label>
           </div>
         </div>
+
+        {/* Beta Feedback Modal */}
+        <BetaFeedbackModal 
+          isOpen={showFeedbackModal} 
+          onClose={() => setShowFeedbackModal(false)} 
+        />
 
       </div>
     </div>

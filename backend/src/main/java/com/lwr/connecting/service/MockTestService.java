@@ -60,7 +60,7 @@ public class MockTestService {
             int missingCount = targetCount - selectedQuestions.size();
             Subject subject = (req.getSubjectId() != null)
                     ? subjectRepository.findById(req.getSubjectId()).orElse(null)
-                    : subjectRepository.findByExamId(exam.getId()).stream().findFirst().orElse(null);
+                    : subjectRepository.findByActiveTrueOrderByNameAsc().stream().findFirst().orElse(null);
 
             if (subject != null) {
                 List<Question> aiGenerated = aiQuestionService.generateAndValidateQuestions(
@@ -123,16 +123,17 @@ public class MockTestService {
 
         // Fallback default patterns if none configured for exam
         if (patterns.isEmpty()) {
-            List<Subject> subjects = subjectRepository.findByExamId(examId);
+            List<Subject> subjects = subjectRepository.findByActiveTrueOrderByNameAsc();
             patterns = new ArrayList<>();
-            int countPerSubject = exam.getCategory() == com.lwr.connecting.enums.ExamCategory.STATE ? 40 : 25;
+            boolean isState = exam.getType() == com.lwr.connecting.enums.ExamType.STATE;
+            int countPerSubject = isState ? 40 : 25;
             for (Subject sub : subjects) {
                 patterns.add(ExamTestPattern.builder()
                         .exam(exam)
                         .subject(sub)
                         .questionCount(countPerSubject)
-                        .marksPerQuestion(exam.getCategory() == com.lwr.connecting.enums.ExamCategory.STATE ? 1 : 4)
-                        .negativeMarks(exam.getCategory() == com.lwr.connecting.enums.ExamCategory.STATE ? 0 : 1)
+                        .marksPerQuestion(isState ? 1 : 4)
+                        .negativeMarks(isState ? 0 : 1)
                         .durationMinutes(60)
                         .build());
             }
@@ -234,7 +235,7 @@ public class MockTestService {
         TestAttempt attempt = testAttemptRepository.findById(dto.getAttemptId())
                 .orElseThrow(() -> new IllegalArgumentException("Attempt not found: " + dto.getAttemptId()));
 
-        if (!attempt.getUser().getId().equals(user.getId()) && user.getRole() != Role.ROLE_ADMIN) {
+        if (!attempt.getUser().getId().equals(user.getId()) && !isAdmin(user)) {
             throw new IllegalStateException("Unauthorized to submit attempt");
         }
 
@@ -310,7 +311,7 @@ public class MockTestService {
         TestAttempt attempt = testAttemptRepository.findById(attemptId)
                 .orElseThrow(() -> new IllegalArgumentException("Attempt not found: " + attemptId));
 
-        if (!attempt.getUser().getId().equals(user.getId()) && user.getRole() != Role.ROLE_ADMIN) {
+        if (!attempt.getUser().getId().equals(user.getId()) && !isAdmin(user)) {
             throw new IllegalStateException("Unauthorized view");
         }
 
@@ -564,5 +565,11 @@ public class MockTestService {
                 .accuracyPercentage(attempt.getAccuracyPercentage())
                 .status(attempt.getStatus())
                 .build();
+    }
+
+    /** Returns true if the user has the ROLE_ADMIN role. */
+    private boolean isAdmin(User user) {
+        return user.getRoles() != null &&
+               user.getRoles().stream().anyMatch(r -> "ROLE_ADMIN".equals(r.getName()));
     }
 }

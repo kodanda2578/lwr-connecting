@@ -36,7 +36,7 @@ public interface CutoffRepository extends JpaRepository<Cutoff, Long> {
            "AND c.exam.id = :examId " +
            "AND (:category IS NULL OR LOWER(c.category) = LOWER(:category)) " +
            "AND (:branchId IS NULL OR c.branch.id = :branchId) " +
-           "AND c.closingRank >= :userRank " +
+           "AND (:userRank IS NULL OR c.closingRank IS NOT NULL) " +
            "ORDER BY c.closingRank ASC")
     List<Cutoff> predictEligibleCutoffs(
             @Param("examId") Long examId,

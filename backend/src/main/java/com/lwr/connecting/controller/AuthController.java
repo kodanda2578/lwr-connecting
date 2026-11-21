@@ -32,7 +32,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 @RestController
-@RequestMapping("/auth")
+@RequestMapping({"/auth", "/api/auth"})
 public class AuthController {
 
     private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
@@ -57,6 +57,14 @@ public class AuthController {
 
     @Autowired
     private EmailService emailService;
+
+    @Autowired
+    private com.lwr.connecting.service.BetaAccessService betaAccessService;
+
+    @Autowired
+    private com.lwr.connecting.service.BetaInvitationService betaInvitationService;
+
+    private static final Object REGISTRATION_LOCK = new Object();
 
     private final SecureRandom random = new SecureRandom();
 
@@ -169,10 +177,10 @@ public class AuthController {
             boolean emailSent = emailService.sendLoginEmailOtp(user.getEmail(), user.getFullName(), otp, "LOGIN_OTP_" + user.getId() + "_" + System.currentTimeMillis());
 
             if (!emailSent) {
-                logger.error("Login OTP email delivery failed via Gmail SMTP for recipient userId {}", user.getId());
+                logger.error("Login OTP email delivery failed via SMTP for recipient userId {}", user.getId());
                 Map<String, Object> err = new HashMap<>();
                 err.put("success", false);
-                err.put("error", "Unable to send verification email. Please try again.");
+                err.put("error", "Unable to send verification email. Real SMTP delivery is active but SMTP credentials (SMTP_USERNAME / SMTP_PASSWORD) are not configured or email delivery failed.");
                 return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(err);
             }
 
@@ -214,38 +222,95 @@ public class AuthController {
             String password = request.get("password");
 
             if (email == null || email.isBlank() || password == null || password.isBlank() || fullName == null || fullName.isBlank()) {
+                betaAccessService.recordFailedRegistration();
                 Map<String, String> error = new HashMap<>();
                 error.put("error", "Full name, email, and password are required.");
                 return ResponseEntity.badRequest().body(error);
             }
 
-            if (userRepository.existsByEmail(email)) {
-                Map<String, String> error = new HashMap<>();
-                error.put("error", "Email is already registered! Please sign in.");
-                return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+            email = email.trim().toLowerCase();
+            String inviteCode = request.get("inviteCode");
+            if (inviteCode == null || inviteCode.isBlank()) {
+                inviteCode = request.get("invitationCode");
             }
 
-            if (mobileNumber != null && !mobileNumber.isBlank() && userRepository.existsByMobileNumber(mobileNumber)) {
-                Map<String, String> error = new HashMap<>();
-                error.put("error", "Mobile number is already registered! Please use another number or sign in.");
-                return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+            User savedUser;
+            synchronized (REGISTRATION_LOCK) {
+                // Check Beta limits and registration pause status under lock to prevent concurrency bypass
+                try {
+                    betaAccessService.assertBetaRegistrationAllowed();
+                } catch (org.springframework.web.server.ResponseStatusException bse) {
+                    betaAccessService.recordFailedRegistration();
+                    Map<String, String> err = new HashMap<>();
+                    err.put("error", bse.getReason());
+                    return ResponseEntity.status(bse.getStatusCode()).body(err);
+                }
+
+                // Check Wave 1 Invite-Only Mode enforcement
+                com.lwr.connecting.entity.BetaAccessConfig betaConfig = betaAccessService.getOrCreateConfig();
+                boolean isInviteOnly = Boolean.TRUE.equals(betaConfig.getInviteOnlyMode());
+
+                if (isInviteOnly) {
+                    if (inviteCode == null || inviteCode.isBlank()) {
+                        betaAccessService.recordFailedRegistration();
+                        Map<String, String> error = new HashMap<>();
+                        error.put("error", "Registration is currently invite-only for Wave 1. A valid invitation code is required to register.");
+                        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+                    }
+
+                    Map<String, Object> validation = betaInvitationService.validateInvitation(inviteCode, email);
+                    if (!Boolean.TRUE.equals(validation.get("valid"))) {
+                        betaAccessService.recordFailedRegistration();
+                        Map<String, String> error = new HashMap<>();
+                        error.put("error", String.valueOf(validation.get("reason")));
+                        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+                    }
+                } else if (inviteCode != null && !inviteCode.isBlank()) {
+                    // Even if invite-only mode is temporarily disabled, validate if a code was supplied
+                    Map<String, Object> validation = betaInvitationService.validateInvitation(inviteCode, email);
+                    if (!Boolean.TRUE.equals(validation.get("valid"))) {
+                        betaAccessService.recordFailedRegistration();
+                        Map<String, String> error = new HashMap<>();
+                        error.put("error", String.valueOf(validation.get("reason")));
+                        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+                    }
+                }
+
+                if (userRepository.existsByEmail(email)) {
+                    betaAccessService.recordFailedRegistration();
+                    Map<String, String> error = new HashMap<>();
+                    error.put("error", "Email is already registered! Please sign in.");
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+                }
+
+                if (mobileNumber != null && !mobileNumber.isBlank() && userRepository.existsByMobileNumber(mobileNumber)) {
+                    betaAccessService.recordFailedRegistration();
+                    Map<String, String> error = new HashMap<>();
+                    error.put("error", "Mobile number is already registered! Please use another number or sign in.");
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+                }
+
+                Role studentRole = roleRepository.findByName("ROLE_STUDENT")
+                        .orElseGet(() -> roleRepository.save(Role.builder().name("ROLE_STUDENT").build()));
+
+                User user = User.builder()
+                        .fullName(fullName)
+                        .email(email)
+                        .mobileNumber(mobileNumber)
+                        .passwordHash(passwordEncoder.encode(password))
+                        .emailVerified(false)
+                        .mobileVerified(true)
+                        .accountStatus("PENDING_VERIFICATION")
+                        .roles(Collections.singleton(studentRole))
+                        .build();
+
+                savedUser = userRepository.save(user);
+
+                // Redeem invitation immediately under lock
+                if (inviteCode != null && !inviteCode.isBlank()) {
+                    betaInvitationService.redeemInvitation(inviteCode, savedUser.getId(), savedUser.getEmail());
+                }
             }
-
-            Role studentRole = roleRepository.findByName("ROLE_STUDENT")
-                    .orElseGet(() -> roleRepository.save(Role.builder().name("ROLE_STUDENT").build()));
-
-            User user = User.builder()
-                    .fullName(fullName)
-                    .email(email)
-                    .mobileNumber(mobileNumber)
-                    .passwordHash(passwordEncoder.encode(password))
-                    .emailVerified(false)
-                    .mobileVerified(true)
-                    .accountStatus("PENDING_VERIFICATION")
-                    .roles(Collections.singleton(studentRole))
-                    .build();
-
-            User savedUser = userRepository.save(user);
 
             // Generate and send Email OTP
             String otp = generate6DigitOtp();
@@ -253,10 +318,10 @@ public class AuthController {
 
             boolean emailSent = emailService.sendEmailOtp(email, fullName, otp, "EMAIL_OTP_" + savedUser.getId() + "_" + System.currentTimeMillis());
             if (!emailSent) {
-                logger.error("Registration OTP email delivery failed via Gmail SMTP for recipient userId {}", savedUser.getId());
+                logger.error("Registration OTP email delivery failed via SMTP for recipient userId {}", savedUser.getId());
                 Map<String, Object> err = new HashMap<>();
                 err.put("success", false);
-                err.put("error", "Unable to send verification email. Please try again.");
+                err.put("error", "Unable to send verification email. Real SMTP delivery is active but SMTP credentials (SMTP_USERNAME / SMTP_PASSWORD) are not configured or email delivery failed.");
                 return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(err);
             }
 
@@ -326,10 +391,10 @@ public class AuthController {
 
             boolean emailSent = emailService.sendEmailOtp(user.getEmail(), user.getFullName(), otp, "RE_EMAIL_OTP_" + user.getId() + "_" + System.currentTimeMillis());
             if (!emailSent) {
-                logger.error("Resend Email OTP delivery failed via Gmail SMTP for recipient userId {}", user.getId());
+                logger.error("Resend Email OTP delivery failed via SMTP for recipient userId {}", user.getId());
                 Map<String, Object> err = new HashMap<>();
                 err.put("success", false);
-                err.put("error", "Unable to send verification email. Please try again.");
+                err.put("error", "Unable to send verification email. Real SMTP delivery is active but SMTP credentials (SMTP_USERNAME / SMTP_PASSWORD) are not configured or email delivery failed.");
                 return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(err);
             }
 
@@ -434,11 +499,40 @@ public class AuthController {
 
             String collegeName = body.getOrDefault("collegeName", "").toString();
             Integer intermediateYear = Integer.parseInt(body.getOrDefault("intermediateYear", "2").toString());
+            Integer intermediateClass = body.containsKey("intermediateClass") 
+                    ? Integer.parseInt(body.get("intermediateClass").toString()) 
+                    : (intermediateYear == 1 ? 11 : 12);
+            String studyStream = body.getOrDefault("studyStream", "MPC").toString();
             String board = body.getOrDefault("board", "BIEAP").toString();
             String targetExam = body.getOrDefault("targetExam", "AP_EAPCET").toString();
             String targetBranch = body.getOrDefault("targetBranch", "CSE").toString();
+            String engineeringInterests = body.getOrDefault("engineeringInterests", "").toString();
             String state = body.getOrDefault("state", "Andhra Pradesh").toString();
             String city = body.getOrDefault("city", "Visakhapatnam").toString();
+
+            // Guardian consent & minor safeguards
+            boolean isMinor = body.containsKey("isMinor") 
+                    ? Boolean.parseBoolean(body.get("isMinor").toString()) 
+                    : (intermediateClass == 11 || intermediateYear == 1 || true);
+            String guardianName = body.getOrDefault("guardianName", "").toString();
+            String guardianEmail = body.getOrDefault("guardianEmail", "").toString();
+            String guardianPhone = body.getOrDefault("guardianPhone", "").toString();
+            boolean guardianConsentGiven = body.containsKey("guardianConsentGiven") 
+                    && Boolean.parseBoolean(body.get("guardianConsentGiven").toString());
+
+            // Guardian consent & minor safeguards validation
+            if (isMinor) {
+                if (!guardianConsentGiven) {
+                    Map<String, String> err = new HashMap<>();
+                    err.put("error", "Parent or Legal Guardian consent is mandatory for students under 18.");
+                    return ResponseEntity.badRequest().body(err);
+                }
+                if (guardianName.trim().isEmpty() || guardianPhone.trim().isEmpty()) {
+                    Map<String, String> err = new HashMap<>();
+                    err.put("error", "Parent/Guardian full name and contact number are required for minor students.");
+                    return ResponseEntity.badRequest().body(err);
+                }
+            }
 
             StudentProfile profile = user.getProfile();
             if (profile == null) {
@@ -448,12 +542,23 @@ public class AuthController {
 
             profile.setCollegeName(collegeName);
             profile.setIntermediateYear(intermediateYear);
+            profile.setIntermediateClass(intermediateClass);
+            profile.setStudyStream(studyStream);
             profile.setBoard(board);
             profile.setTargetExam(targetExam);
             profile.setTargetBranch(targetBranch);
+            profile.setEngineeringInterests(engineeringInterests);
             profile.setState(state);
             profile.setCity(city);
             profile.setPreferredLocation(city);
+            profile.setIsMinor(isMinor);
+            profile.setGuardianName(guardianName);
+            profile.setGuardianEmail(guardianEmail);
+            profile.setGuardianPhone(guardianPhone);
+            profile.setGuardianConsentGiven(guardianConsentGiven);
+            if (guardianConsentGiven) {
+                profile.setGuardianConsentTimestamp(LocalDateTime.now());
+            }
             profile.setProfileCompleted(true);
 
             user.setProfile(profile);
@@ -535,10 +640,10 @@ public class AuthController {
             boolean emailSent = emailService.sendLoginEmailOtp(user.getEmail(), user.getFullName(), otp, "RE_LOGIN_OTP_" + user.getId() + "_" + System.currentTimeMillis());
 
             if (!emailSent) {
-                logger.error("Resend Login OTP email delivery failed via Gmail SMTP for recipient userId {}", user.getId());
+                logger.error("Resend Login OTP email delivery failed via SMTP for recipient userId {}", user.getId());
                 Map<String, Object> err = new HashMap<>();
                 err.put("success", false);
-                err.put("error", "Unable to send verification email. Please try again.");
+                err.put("error", "Unable to send verification email. Real SMTP delivery is active but SMTP credentials (SMTP_USERNAME / SMTP_PASSWORD) are not configured or email delivery failed.");
                 return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(err);
             }
 

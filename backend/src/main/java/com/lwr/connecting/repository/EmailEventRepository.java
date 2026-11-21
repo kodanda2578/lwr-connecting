@@ -7,4 +7,8 @@ import java.util.Optional;
 public interface EmailEventRepository extends JpaRepository<EmailEvent, Long> {
     Optional<EmailEvent> findByIdempotencyKey(String idempotencyKey);
     Boolean existsByIdempotencyKeyAndStatus(String idempotencyKey, String status);
+    long countByStatus(String status);
+    long countByEventTypeAndStatus(String eventType, String status);
+    long countByEventType(String eventType);
 }
+

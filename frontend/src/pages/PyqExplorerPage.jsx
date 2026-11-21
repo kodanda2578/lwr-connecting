@@ -85,42 +85,38 @@ export default function PyqExplorerPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 py-10 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="page-wrapper">
+      <div className="container">
         
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-800 pb-6">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 mb-3">
-              <span>Verified PYQs Repository</span>
-            </div>
-            <h1 className="text-3xl font-extrabold text-white tracking-tight sm:text-4xl bg-gradient-to-r from-cyan-400 via-sky-300 to-indigo-400 bg-clip-text text-transparent">
-              Previous Year Questions (PYQ) Explorer
-            </h1>
-            <p className="mt-2 text-slate-400 text-sm max-w-2xl">
-              Solve official JEE Main, JEE Advanced, and State Engineering Entrance PYQs with step-by-step verified explanations.
-            </p>
+        <div className="page-hero">
+          <div className="page-hero-badge">
+            <Sparkles size={14} /> Verified PYQs Repository
           </div>
-
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-medium text-slate-400 bg-slate-900 border border-slate-800 px-3 py-2 rounded-lg">
-              Total Questions Available: <strong className="text-cyan-400">{questions.length}</strong>
+          <h1 className="page-hero-title">
+            Previous Year Questions (PYQ) Explorer
+          </h1>
+          <p className="page-hero-subtitle">
+            Solve official JEE Main, JEE Advanced, and State Engineering Entrance PYQs with step-by-step verified explanations.
+          </p>
+          <div style={{ marginTop: '1rem' }}>
+            <span className="badge badge-cyan" style={{ padding: '0.4rem 0.9rem', fontSize: '0.8rem' }}>
+              Total Questions: {questions.length}
             </span>
           </div>
         </div>
 
         {/* Filter Bar */}
-        <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800/80 rounded-2xl p-6 shadow-xl space-y-4">
-          <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Filter Questions</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="filter-panel">
+          <div className="filter-grid-5">
             
             {/* Exam Filter */}
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1">Exam</label>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Entrance Exam</label>
               <select
                 value={selectedExamId}
                 onChange={(e) => setSelectedExamId(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-cyan-500"
+                className="form-control form-select"
               >
                 <option value="">All Exams</option>
                 {exams.map((ex) => (
@@ -130,12 +126,12 @@ export default function PyqExplorerPage() {
             </div>
 
             {/* Subject Filter */}
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1">Subject</label>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Subject</label>
               <select
                 value={selectedSubjectId}
                 onChange={(e) => setSelectedSubjectId(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-cyan-500"
+                className="form-control form-select"
               >
                 <option value="">All Subjects</option>
                 {subjects.map((sub) => (
@@ -145,12 +141,12 @@ export default function PyqExplorerPage() {
             </div>
 
             {/* Topic Filter */}
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1">Topic</label>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Topic</label>
               <select
                 value={selectedTopicId}
                 onChange={(e) => setSelectedTopicId(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-cyan-500"
+                className="form-control form-select"
               >
                 <option value="">All Topics</option>
                 {topics.map((t) => (
@@ -160,12 +156,12 @@ export default function PyqExplorerPage() {
             </div>
 
             {/* Year Filter */}
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1">Year</label>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Exam Year</label>
               <select
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-cyan-500"
+                className="form-control form-select"
               >
                 <option value="">All Years</option>
                 <option value="2024">2024</option>
@@ -177,12 +173,12 @@ export default function PyqExplorerPage() {
             </div>
 
             {/* Difficulty Filter */}
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1">Difficulty</label>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Difficulty</label>
               <select
                 value={selectedDifficulty}
                 onChange={(e) => setSelectedDifficulty(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-cyan-500"
+                className="form-control form-select"
               >
                 <option value="">All Difficulties</option>
                 <option value="EASY">Easy</option>
@@ -194,19 +190,21 @@ export default function PyqExplorerPage() {
           </div>
 
           {/* Search bar */}
-          <form onSubmit={handleSearchSubmit} className="pt-2 flex gap-3">
+          <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
             <input
               type="text"
               placeholder="Search by keywords (e.g. kinematics, det(A), projectile...)"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+              className="form-control"
+              style={{ flex: 1 }}
             />
             <button
               type="submit"
-              className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-5 py-2 rounded-xl text-sm transition-all shadow-lg shadow-cyan-500/20"
+              className="btn-primary"
+              style={{ padding: '0.75rem 1.75rem', flexShrink: 0 }}
             >
-              Search
+              Search PYQs
             </button>
           </form>
         </div>

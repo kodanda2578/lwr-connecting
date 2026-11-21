@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/mock-tests")
+@RequestMapping({"/mock-tests", "/api/mock-tests"})
 @RequiredArgsConstructor
 public class MockTestController {
 
@@ -65,15 +65,18 @@ public class MockTestController {
 
     @GetMapping("/my-attempts")
     public ResponseEntity<List<TestAttemptDTO>> getMyAttempts(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getName())) {
+            return ResponseEntity.ok(java.util.Collections.emptyList());
+        }
         User user = getUserFromAuth(authentication);
         return ResponseEntity.ok(mockTestService.getStudentAttempts(user));
     }
 
     private User getUserFromAuth(Authentication authentication) {
-        if (authentication == null || authentication.getName() == null) {
-            throw new IllegalStateException("User authentication required");
+        if (authentication == null || authentication.getName() == null || "anonymousUser".equals(authentication.getName())) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.UNAUTHORIZED, "User authentication required");
         }
         return userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new IllegalArgumentException("User not found: " + authentication.getName()));
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found: " + authentication.getName()));
     }
 }

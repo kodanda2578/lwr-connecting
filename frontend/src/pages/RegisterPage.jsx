@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { apiService } from '../services/apiService';
+import { buildApiUrl } from '../config/appConfig';
 import { 
   GraduationCap, 
   ArrowRight, 
@@ -15,7 +17,11 @@ import {
   CheckCircle2, 
   RefreshCw,
   Sparkles,
-  FileText
+  FileText,
+  ShieldCheck,
+  AlertTriangle,
+  Info,
+  Key
 } from 'lucide-react';
 
 export const RegisterPage = () => {
@@ -44,18 +50,65 @@ export const RegisterPage = () => {
     confirmPassword: '',
     collegeName: '',
     intermediateYear: 2,
+    intermediateClass: 12,
+    studyStream: 'MPC',
     board: 'BIEAP',
     targetExam: 'AP_EAPCET',
     targetBranch: 'CSE',
+    engineeringInterests: 'Computer Science & AI / Data Science',
     state: 'Andhra Pradesh',
-    city: 'Visakhapatnam'
+    city: 'Visakhapatnam',
+    isMinor: true,
+    guardianName: '',
+    guardianEmail: '',
+    guardianPhone: '',
+    guardianConsentGiven: false,
+    inviteCode: ''
   });
 
   const [userId, setUserId] = useState(null);
+  const [betaStatus, setBetaStatus] = useState(null);
+  const [inviteValidation, setInviteValidation] = useState(null);
+  const [checkingInvite, setCheckingInvite] = useState(false);
 
   // Email OTP States
   const [emailOtp, setEmailOtp] = useState('');
   const [cooldown, setCooldown] = useState(0);
+
+  // Fetch Beta Access Status and check invite in URL
+  useEffect(() => {
+    apiService.getBetaStatus()
+      .then((status) => {
+        if (status) setBetaStatus(status);
+      })
+      .catch(() => {});
+
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      const urlInvite = searchParams.get('invite') || searchParams.get('code');
+      if (urlInvite) {
+        const clean = urlInvite.trim().toUpperCase();
+        setFormData(prev => ({ ...prev, inviteCode: clean }));
+        validateInviteCodeLive(clean);
+      }
+    } catch (e) {}
+  }, []);
+
+  const validateInviteCodeLive = async (code) => {
+    if (!code || code.trim().length < 4) {
+      setInviteValidation(null);
+      return;
+    }
+    try {
+      setCheckingInvite(true);
+      const res = await apiService.validateInviteCode(code.trim().toUpperCase(), formData.email);
+      setInviteValidation(res);
+    } catch (e) {
+      setInviteValidation({ valid: false, reason: 'Error checking code' });
+    } finally {
+      setCheckingInvite(false);
+    }
+  };
 
   // Resume Onboarding if redirected from Login or ProtectedRoute
   useEffect(() => {
@@ -108,17 +161,23 @@ export const RegisterPage = () => {
       return;
     }
 
+    if (betaStatus?.inviteOnlyMode && (!formData.inviteCode || formData.inviteCode.trim().length === 0)) {
+      setError('LWR Connecting Wave 1 is strictly invite-only. Please enter your 10-character invitation code (e.g. LWR-W1-XXXXXX).');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/register', {
+      const res = await fetch(buildApiUrl('/auth/register'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fullName: formData.fullName,
           email: formData.email,
           mobileNumber: formData.mobileNumber || '',
-          password: formData.password
+          password: formData.password,
+          inviteCode: formData.inviteCode ? formData.inviteCode.trim().toUpperCase() : ''
         })
       });
 
@@ -155,7 +214,7 @@ export const RegisterPage = () => {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/verify-email-otp', {
+      const res = await fetch(buildApiUrl('/auth/verify-email-otp'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: userId.toString(), otp: emailOtp })
@@ -183,7 +242,7 @@ export const RegisterPage = () => {
     setInfoMessage('');
 
     try {
-      const res = await fetch('/api/auth/send-email-otp', {
+      const res = await fetch(buildApiUrl('/auth/send-email-otp'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId })
@@ -209,12 +268,25 @@ export const RegisterPage = () => {
   // STEP 3: Submit Academic Details
   const handleStep3Submit = (e) => {
     e.preventDefault();
-    setStep(4); // Move to Location step
+    setStep(4); // Move to Location & Guardian step
   };
 
-  // STEP 4: Submit Location Details
+  // STEP 4: Submit Location Details & Guardian Consent
   const handleStep4Submit = (e) => {
     e.preventDefault();
+    setError('');
+
+    if (formData.isMinor) {
+      if (!formData.guardianName?.trim() || !formData.guardianPhone?.trim()) {
+        setError('Parent or Legal Guardian name and contact number are required for students under 18.');
+        return;
+      }
+      if (!formData.guardianConsentGiven) {
+        setError('Parent or Guardian consent is required for minor students to access the beta platform.');
+        return;
+      }
+    }
+
     setStep(5); // Move to Profile Summary step
   };
 
@@ -225,18 +297,26 @@ export const RegisterPage = () => {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/complete-profile', {
+      const res = await fetch(buildApiUrl('/auth/complete-profile'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId,
           collegeName: formData.collegeName,
           intermediateYear: formData.intermediateYear,
+          intermediateClass: Number(formData.intermediateClass),
+          studyStream: formData.studyStream,
           board: formData.board,
           targetExam: formData.targetExam,
           targetBranch: formData.targetBranch,
+          engineeringInterests: formData.engineeringInterests,
           state: formData.state,
-          city: formData.city
+          city: formData.city,
+          isMinor: formData.isMinor,
+          guardianName: formData.guardianName,
+          guardianEmail: formData.guardianEmail,
+          guardianPhone: formData.guardianPhone,
+          guardianConsentGiven: formData.guardianConsentGiven
         })
       });
 
@@ -270,6 +350,60 @@ export const RegisterPage = () => {
   return (
     <div style={{ padding: '3.5rem 0 5rem 0', minHeight: 'calc(100vh - 80px)' }}>
       <div className="container" style={{ maxWidth: '680px' }}>
+
+        {/* Beta Notice & Capacity Banner */}
+        {betaStatus && (() => {
+          const spotsLeft = betaStatus.remainingSpots ?? betaStatus.spotsRemaining ?? 0;
+          const registered = betaStatus.registeredStudents ?? betaStatus.currentBetaCount ?? 0;
+          const limit = betaStatus.maxStudentsLimit ?? betaStatus.registrationLimit ?? 100;
+          const isPaused = Boolean(betaStatus.registrationsPaused);
+          const isFull = spotsLeft <= 0;
+
+          return (
+            <div style={{
+              background: isPaused || isFull
+                ? 'rgba(239, 68, 68, 0.12)'
+                : 'linear-gradient(135deg, rgba(6, 182, 212, 0.12) 0%, rgba(139, 92, 246, 0.12) 100%)',
+              border: isPaused || isFull
+                ? '1px solid rgba(239, 68, 68, 0.3)'
+                : '1px solid rgba(6, 182, 212, 0.35)',
+              borderRadius: '12px',
+              padding: '1rem 1.25rem',
+              marginBottom: '1.5rem',
+              fontSize: '0.88rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{
+                    padding: '0.2rem 0.6rem',
+                    borderRadius: '9999px',
+                    background: isPaused ? '#ef4444' : '#06b6d4',
+                    color: '#ffffff',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em'
+                  }}>
+                    {isPaused ? 'Beta Paused' : 'Controlled Beta v1'}
+                  </span>
+                  <strong style={{ color: '#ffffff' }}>
+                    Intermediate MPC Cohort (Class 11 & 12)
+                  </strong>
+                </div>
+                <div style={{ color: (!isFull && !isPaused) ? '#38bdf8' : '#f87171', fontWeight: 600, fontSize: '0.82rem' }}>
+                  {registered} / {limit} Registered ({spotsLeft} spots left)
+                </div>
+              </div>
+              <p style={{ color: '#cbd5e1', fontSize: '0.82rem', margin: '0 0 0.4rem 0', lineHeight: 1.5 }}>
+                {betaStatus.betaNoticeMessage || 'Welcome to the LWR Connecting Beta for Intermediate Class 11 and Class 12 students.'}
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#10b981', fontSize: '0.76rem' }}>
+                <ShieldCheck size={14} />
+                <span>Safety & Privacy First: No Aadhaar or PAN required. Supervised mentorship with guardian consent.</span>
+              </div>
+            </div>
+          );
+        })()}
         
         {/* Step Indicator Header */}
         <div className="glass-panel" style={{ padding: '1.5rem 2rem', marginBottom: '2rem', textAlign: 'center' }}>
@@ -289,8 +423,8 @@ export const RegisterPage = () => {
           <h2 style={{ fontSize: '1.6rem', color: '#ffffff' }}>
             {step === 1 && 'Step 1: Create your LWR Account'}
             {step === 2 && 'Step 2: Verify your Email 📧'}
-            {step === 3 && 'Step 3: Academic Details 🎓'}
-            {step === 4 && 'Step 4: Location Details 📍'}
+            {step === 3 && 'Step 3: Academic Details & Interests 🎓'}
+            {step === 4 && 'Step 4: Location & Guardian Consent 🛡️'}
             {step === 5 && 'Step 5: Profile Summary 📋'}
             {step === 6 && "Step 6: You're All Set! 🎉"}
           </h2>
@@ -354,6 +488,63 @@ export const RegisterPage = () => {
         {step === 1 && (
           <div className="glass-panel" style={{ padding: '2.5rem' }}>
             <form onSubmit={handleStep1Submit}>
+              {/* Beta Wave 1 Invitation Code Input */}
+              <div className="form-group" style={{
+                background: 'rgba(139, 92, 246, 0.08)',
+                border: '1px solid rgba(139, 92, 246, 0.25)',
+                borderRadius: '12px',
+                padding: '1rem',
+                marginBottom: '1.25rem'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+                  <label style={{ margin: 0, fontWeight: 700, color: '#c4b5fd', fontSize: '0.85rem' }}>
+                    <Key size={14} style={{ display: 'inline', marginRight: '6px' }} />
+                    Wave 1 Beta Invitation Code {betaStatus?.inviteOnlyMode && '*'}
+                  </label>
+                  {betaStatus?.inviteOnlyMode && (
+                    <span className="badge badge-purple" style={{ fontSize: '0.7rem' }}>
+                      INVITE-ONLY (CAPACITY: 50)
+                    </span>
+                  )}
+                </div>
+                <input 
+                  type="text"
+                  name="inviteCode"
+                  className="form-control"
+                  placeholder="e.g. LWR-W1-7K9P2X"
+                  value={formData.inviteCode}
+                  onChange={(e) => {
+                    const val = e.target.value.toUpperCase();
+                    setFormData(prev => ({ ...prev, inviteCode: val }));
+                    validateInviteCodeLive(val);
+                  }}
+                  required={Boolean(betaStatus?.inviteOnlyMode)}
+                  style={{ textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}
+                />
+                {checkingInvite && (
+                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.35rem' }}>
+                    Checking invitation code...
+                  </div>
+                )}
+                {inviteValidation && !checkingInvite && (
+                  <div style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    marginTop: '0.35rem',
+                    color: inviteValidation.valid ? '#34d399' : '#f87171',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem'
+                  }}>
+                    {inviteValidation.valid ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}
+                    {inviteValidation.valid ? 'Verified Wave 1 Invitation Code' : inviteValidation.reason}
+                  </div>
+                )}
+                <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.35rem' }}>
+                  LWR Connecting Wave 1 is limited to 50 Intermediate students. Request an invite via your college representative or mentor network.
+                </div>
+              </div>
+
               <div className="form-group">
                 <label><User size={14} style={{ display: 'inline', marginRight: '4px' }} /> Full Name *</label>
                 <input 
@@ -422,10 +613,36 @@ export const RegisterPage = () => {
                 </div>
               </div>
 
-              <button type="submit" disabled={loading} className="btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem', padding: '0.85rem' }}>
-                {loading ? 'Starting Registration...' : 'Continue to Email Verification'} <ArrowRight size={18} />
+              <button 
+                type="submit" 
+                disabled={loading || (betaStatus && (Boolean(betaStatus.registrationsPaused) || (betaStatus.remainingSpots ?? betaStatus.spotsRemaining ?? 1) <= 0))} 
+                className="btn-primary" 
+                style={{ 
+                  width: '100%', 
+                  justifyContent: 'center', 
+                  marginTop: '1.25rem', 
+                  padding: '0.85rem',
+                  opacity: (betaStatus && (Boolean(betaStatus.registrationsPaused) || (betaStatus.remainingSpots ?? betaStatus.spotsRemaining ?? 1) <= 0)) ? 0.5 : 1,
+                  cursor: (betaStatus && (Boolean(betaStatus.registrationsPaused) || (betaStatus.remainingSpots ?? betaStatus.spotsRemaining ?? 1) <= 0)) ? 'not-allowed' : 'pointer'
+                }}>
+                {loading ? 'Starting Registration...' : (
+                  Boolean(betaStatus?.registrationsPaused) 
+                    ? 'Beta Registrations Paused' 
+                    : ((betaStatus?.remainingSpots ?? betaStatus?.spotsRemaining ?? 1) <= 0 ? 'Beta Limit Reached (100 Students)' : 'Continue to Email Verification')
+                )} <ArrowRight size={18} />
               </button>
             </form>
+
+            {Boolean(betaStatus?.registrationsPaused) && (
+              <div style={{ color: '#ef4444', fontSize: '0.85rem', marginTop: '0.75rem', textAlign: 'center' }}>
+                ⚠️ Beta registrations are temporarily paused by the administration.
+              </div>
+            )}
+            {betaStatus && !Boolean(betaStatus.registrationsPaused) && (betaStatus.remainingSpots ?? betaStatus.spotsRemaining ?? 1) <= 0 && (
+              <div style={{ color: '#ef4444', fontSize: '0.85rem', marginTop: '0.75rem', textAlign: 'center' }}>
+                ⚠️ The initial 100-student beta limit has been reached. Please check back soon or sign in if you already registered.
+              </div>
+            )}
 
             <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.9rem', color: '#94a3b8' }}>
               Already registered? <Link to="/login" style={{ color: '#06b6d4', fontWeight: 600 }}>Sign In</Link>
@@ -476,14 +693,21 @@ export const RegisterPage = () => {
         {/* STEP 3 FORM: ACADEMIC DETAILS */}
         {step === 3 && (
           <div className="glass-panel" style={{ padding: '2.5rem' }}>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h3 style={{ fontSize: '1.3rem', color: '#ffffff', marginBottom: '0.4rem' }}>Academic Details & Engineering Goals</h3>
+              <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: 0 }}>
+                We use this information strictly to configure syllabus milestones, mock test patterns, and previous year cutoff predictions.
+              </p>
+            </div>
+
             <form onSubmit={handleStep3Submit}>
               <div className="form-group">
-                <label><Building2 size={14} style={{ display: 'inline', marginRight: '4px' }} /> Current College / Junior College / School Name *</label>
+                <label><Building2 size={14} style={{ display: 'inline', marginRight: '4px' }} /> Current Junior College / School Name *</label>
                 <input 
                   type="text"
                   name="collegeName"
                   className="form-control"
-                  placeholder="e.g. Narayana / Sri Chaitanya / Govt Junior College"
+                  placeholder="e.g. Narayana Junior College / Sri Chaitanya / Govt Junior College"
                   value={formData.collegeName}
                   onChange={handleChange}
                   required
@@ -492,18 +716,44 @@ export const RegisterPage = () => {
 
               <div className="grid-2">
                 <div className="form-group">
-                  <label><BookOpen size={14} style={{ display: 'inline', marginRight: '4px' }} /> Intermediate Year</label>
+                  <label><BookOpen size={14} style={{ display: 'inline', marginRight: '4px' }} /> Intermediate Class *</label>
                   <select 
-                    name="intermediateYear"
+                    name="intermediateClass"
                     className="form-control"
-                    value={formData.intermediateYear}
-                    onChange={handleChange}>
-                    <option value={1}>1st Year (Class 11)</option>
-                    <option value={2}>2nd Year (Class 12 / Appearing)</option>
-                    <option value={3}>Intermediate Passed / Long Term</option>
+                    value={formData.intermediateClass}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value);
+                      setFormData(prev => ({ 
+                        ...prev, 
+                        intermediateClass: val, 
+                        intermediateYear: val === 11 ? 1 : 2 
+                      }));
+                    }}>
+                    <option value={11}>Class 11 (Intermediate 1st Year)</option>
+                    <option value={12}>Class 12 (Intermediate 2nd Year)</option>
                   </select>
+                  <small style={{ color: '#64748b', fontSize: '0.75rem', display: 'block', marginTop: '4px' }}>
+                    Used to adjust difficulty of test questions and syllabus coverage.
+                  </small>
                 </div>
 
+                <div className="form-group">
+                  <label>Study Stream *</label>
+                  <select 
+                    name="studyStream"
+                    className="form-control"
+                    value={formData.studyStream}
+                    onChange={handleChange}>
+                    <option value="MPC">MPC (Mathematics, Physics, Chemistry) — Recommended</option>
+                    <option value="Other">Other Stream (BiPC / MEC / Vocational)</option>
+                  </select>
+                  <small style={{ color: '#64748b', fontSize: '0.75rem', display: 'block', marginTop: '4px' }}>
+                    Required for engineering entrance preparation (JEE & EAPCET).
+                  </small>
+                </div>
+              </div>
+
+              <div className="grid-2">
                 <div className="form-group">
                   <label>Education Board</label>
                   <select 
@@ -517,57 +767,86 @@ export const RegisterPage = () => {
                     <option value="Other">Other Board</option>
                   </select>
                 </div>
-              </div>
 
-              <div className="grid-2">
                 <div className="form-group">
-                  <label><Target size={14} style={{ display: 'inline', marginRight: '4px' }} /> Target Entrance Exam</label>
+                  <label><Target size={14} style={{ display: 'inline', marginRight: '4px' }} /> Target Entrance Exam *</label>
                   <select 
                     name="targetExam"
                     className="form-control"
                     value={formData.targetExam}
                     onChange={handleChange}>
-                    <option value="AP_EAPCET">AP EAPCET (EAMCET)</option>
-                    <option value="JEE_MAIN">JEE Main</option>
-                    <option value="JEE_ADV">JEE Advanced</option>
-                    <option value="BOTH">Both JEE + AP EAPCET</option>
-                    <option value="Other">Other Exam</option>
+                    <option value="AP_EAPCET">AP EAPCET (Andhra Pradesh Engineering)</option>
+                    <option value="TG_EAPCET">TG EAPCET (Telangana Engineering)</option>
+                    <option value="JEE_MAIN">JEE Main (National NITs/IIITs)</option>
+                    <option value="JEE_ADV">JEE Advanced (IITs)</option>
+                    <option value="BOTH">Both JEE Main + State EAPCET</option>
                   </select>
-                </div>
-
-                <div className="form-group">
-                  <label>Target B.Tech Branch</label>
-                  <select 
-                    name="targetBranch"
-                    className="form-control"
-                    value={formData.targetBranch}
-                    onChange={handleChange}>
-                    <option value="CSE">Computer Science (CSE)</option>
-                    <option value="AI_DS">AI & Data Science (AI/DS)</option>
-                    <option value="ECE">Electronics (ECE)</option>
-                    <option value="EEE">Electrical (EEE)</option>
-                    <option value="Mechanical">Mechanical</option>
-                    <option value="Civil">Civil</option>
-                    <option value="IT">Information Technology (IT)</option>
-                    <option value="Other">Other Branch</option>
-                  </select>
+                  <small style={{ color: '#64748b', fontSize: '0.75rem', display: 'block', marginTop: '4px' }}>
+                    Configures test format, past cutoffs, and college predictor engine.
+                  </small>
                 </div>
               </div>
 
+              <div className="form-group">
+                <label>Preferred Engineering Specializations / Interests *</label>
+                <select 
+                  name="engineeringInterests"
+                  className="form-control"
+                  value={formData.engineeringInterests}
+                  onChange={handleChange}>
+                  <option value="Computer Science & AI / Data Science">Computer Science & AI / Data Science</option>
+                  <option value="Electronics & Communication (ECE / VLSI)">Electronics & Communication (ECE / VLSI)</option>
+                  <option value="Electrical & Electronics (EEE)">Electrical & Electronics (EEE)</option>
+                  <option value="Mechanical & Automation / Robotics">Mechanical & Automation / Robotics</option>
+                  <option value="Civil & Infrastructure Engineering">Civil & Infrastructure Engineering</option>
+                  <option value="Information Technology & Cybersecurity">Information Technology & Cybersecurity</option>
+                  <option value="Chemical / Biotechnology">Chemical / Biotechnology</option>
+                </select>
+                <small style={{ color: '#64748b', fontSize: '0.75rem', display: 'block', marginTop: '4px' }}>
+                  Filters relevant branch cutoffs and college placement comparisons.
+                </small>
+              </div>
+
+              {/* Privacy Notice Box */}
+              <div style={{
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: '8px',
+                padding: '0.75rem 1rem',
+                margin: '1rem 0',
+                fontSize: '0.78rem',
+                color: '#94a3b8',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <ShieldCheck size={16} color="#06b6d4" />
+                <span>
+                  <strong>Privacy Safeguard:</strong> LWR Connecting will never ask for Aadhaar, PAN, banking details, or passwords outside login.
+                </span>
+              </div>
+
               <button type="submit" className="btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem', padding: '0.85rem' }}>
-                Continue to Location <ArrowRight size={18} />
+                Continue to Location & Guardian Consent <ArrowRight size={18} />
               </button>
             </form>
           </div>
         )}
 
-        {/* STEP 4 FORM: LOCATION DETAILS */}
+        {/* STEP 4 FORM: LOCATION & GUARDIAN SAFEGUARDS */}
         {step === 4 && (
           <div className="glass-panel" style={{ padding: '2.5rem' }}>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h3 style={{ fontSize: '1.3rem', color: '#ffffff', marginBottom: '0.4rem' }}>Location & Minor Safety Safeguards</h3>
+              <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: 0 }}>
+                Because many Intermediate students are minors, we follow strict safety policies and guardian consent procedures.
+              </p>
+            </div>
+
             <form onSubmit={handleStep4Submit}>
               <div className="grid-2">
                 <div className="form-group">
-                  <label><MapPin size={14} style={{ display: 'inline', marginRight: '4px' }} /> State</label>
+                  <label><MapPin size={14} style={{ display: 'inline', marginRight: '4px' }} /> State *</label>
                   <select 
                     name="state"
                     className="form-control"
@@ -585,7 +864,7 @@ export const RegisterPage = () => {
                     type="text"
                     name="city"
                     className="form-control"
-                    placeholder="e.g. Vijayawada, Visakhapatnam"
+                    placeholder="e.g. Vijayawada, Visakhapatnam, Hyderabad"
                     value={formData.city}
                     onChange={handleChange}
                     required
@@ -593,9 +872,113 @@ export const RegisterPage = () => {
                 </div>
               </div>
 
-              <button type="submit" className="btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem', padding: '0.85rem' }}>
-                Continue to Profile Summary <ArrowRight size={18} />
-              </button>
+              {/* Minor & Guardian Consent Card */}
+              <div style={{
+                background: 'rgba(6, 182, 212, 0.05)',
+                border: '1px solid rgba(6, 182, 212, 0.25)',
+                borderRadius: '12px',
+                padding: '1.25rem',
+                marginTop: '1.25rem',
+                marginBottom: '1.25rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                  <ShieldCheck size={20} color="#06b6d4" />
+                  <strong style={{ color: '#ffffff', fontSize: '0.95rem' }}>Parent / Legal Guardian Consent (For Students Under 18)</strong>
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.88rem', color: '#e2e8f0' }}>
+                    <input 
+                      type="checkbox"
+                      checked={formData.isMinor}
+                      onChange={(e) => setFormData(prev => ({ ...prev, isMinor: e.target.checked }))}
+                      style={{ accentColor: '#06b6d4', width: '16px', height: '16px' }}
+                    />
+                    I am an Intermediate student under 18 years old (Minor)
+                  </label>
+                </div>
+
+                {formData.isMinor && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div className="grid-2">
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label style={{ fontSize: '0.8rem' }}>Parent / Guardian Full Name *</label>
+                        <input 
+                          type="text"
+                          name="guardianName"
+                          className="form-control"
+                          placeholder="e.g. S. Venkat Rao"
+                          value={formData.guardianName}
+                          onChange={handleChange}
+                          required={formData.isMinor}
+                        />
+                      </div>
+
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label style={{ fontSize: '0.8rem' }}>Guardian Contact Mobile Number *</label>
+                        <input 
+                          type="tel"
+                          name="guardianPhone"
+                          className="form-control"
+                          placeholder="+91 9876543210"
+                          value={formData.guardianPhone}
+                          onChange={handleChange}
+                          required={formData.isMinor}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label style={{ fontSize: '0.8rem' }}>Guardian Email Address (Optional)</label>
+                      <input 
+                        type="email"
+                        name="guardianEmail"
+                        className="form-control"
+                        placeholder="parent@example.com"
+                        value={formData.guardianEmail}
+                        onChange={handleChange}
+                      />
+                    </div>
+
+                    <div style={{
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: '8px',
+                      padding: '0.85rem',
+                      fontSize: '0.78rem',
+                      color: '#cbd5e1',
+                      lineHeight: 1.5
+                    }}>
+                      <div style={{ fontWeight: 600, color: '#38bdf8', marginBottom: '0.3rem' }}>
+                        🛡️ Child & Minor Safety Policy
+                      </div>
+                      LWR Connecting strictly prohibits unsupervised private backchannels between mentors and minors. All mentorship sessions are conducted in verified group/supervised formats with guardian notification. Students or guardians may request account and data deletion at any time.
+                    </div>
+
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', cursor: 'pointer', fontSize: '0.84rem', color: '#e2e8f0', marginTop: '0.25rem' }}>
+                      <input 
+                        type="checkbox"
+                        checked={formData.guardianConsentGiven}
+                        onChange={(e) => setFormData(prev => ({ ...prev, guardianConsentGiven: e.target.checked }))}
+                        style={{ accentColor: '#06b6d4', width: '18px', height: '18px', marginTop: '2px' }}
+                        required={formData.isMinor}
+                      />
+                      <span>
+                        <strong>I confirm parent/guardian consent:</strong> My parent or legal guardian has reviewed and consented to my participation in the LWR Connecting educational beta, including mock tests, college discovery, and supervised mentorship interactions. *
+                      </span>
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1.25rem' }}>
+                <button type="button" onClick={() => setStep(3)} className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }}>
+                  Back to Academics
+                </button>
+                <button type="submit" className="btn-primary" style={{ flex: 2, justifyContent: 'center', padding: '0.85rem' }}>
+                  Review Profile Summary <ArrowRight size={18} />
+                </button>
+              </div>
             </form>
           </div>
         )}
@@ -638,21 +1021,31 @@ export const RegisterPage = () => {
                 <strong style={{ color: '#cbd5e1' }}>{formData.mobileNumber || 'Not provided'}</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
-                <span style={{ color: '#94a3b8' }}>College / School:</span>
+                <span style={{ color: '#94a3b8' }}>Junior College:</span>
                 <strong style={{ color: '#38bdf8' }}>{formData.collegeName || 'Not specified'}</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
-                <span style={{ color: '#94a3b8' }}>Intermediate Year:</span>
-                <strong style={{ color: '#cbd5e1' }}>Year {formData.intermediateYear} ({formData.board})</strong>
+                <span style={{ color: '#94a3b8' }}>Intermediate Class:</span>
+                <strong style={{ color: '#cbd5e1' }}>Class {formData.intermediateClass} ({formData.studyStream} Stream, {formData.board})</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
-                <span style={{ color: '#94a3b8' }}>Target Exam & Branch:</span>
-                <strong style={{ color: '#c084fc' }}>{formData.targetExam} — {formData.targetBranch}</strong>
+                <span style={{ color: '#94a3b8' }}>Target Exam:</span>
+                <strong style={{ color: '#c084fc' }}>{formData.targetExam}</strong>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
+                <span style={{ color: '#94a3b8' }}>Engineering Interest:</span>
+                <strong style={{ color: '#38bdf8' }}>{formData.engineeringInterests}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
                 <span style={{ color: '#94a3b8' }}>Location:</span>
                 <strong style={{ color: '#cbd5e1' }}>{formData.city}, {formData.state}</strong>
               </div>
+              {formData.isMinor && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.6rem', paddingTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                  <span style={{ color: '#94a3b8' }}>Guardian Safeguard:</span>
+                  <strong style={{ color: '#10b981' }}>{formData.guardianName} (Consent Verified ✓)</strong>
+                </div>
+              )}
             </div>
 
             <form onSubmit={handleCompleteProfile}>
@@ -689,7 +1082,7 @@ export const RegisterPage = () => {
             </h2>
 
             <p style={{ color: '#94a3b8', fontSize: '0.95rem', marginBottom: '2rem' }}>
-              Your account has been fully verified and registered with email OTP.
+              Your account has been fully verified, registered, and authorized for the Beta Cohort.
             </p>
 
             {/* Profile Summary Card */}
@@ -703,25 +1096,27 @@ export const RegisterPage = () => {
                 <strong style={{ color: '#10b981' }}>{formData.email} (Verified ✓)</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ color: '#94a3b8' }}>Mobile Number:</span>
-                <strong style={{ color: '#cbd5e1' }}>{formData.mobileNumber || 'Not provided'}</strong>
+                <span style={{ color: '#94a3b8' }}>Class & Stream:</span>
+                <strong style={{ color: '#cbd5e1' }}>Class {formData.intermediateClass} ({formData.studyStream} Stream)</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ color: '#94a3b8' }}>Current College:</span>
-                <strong style={{ color: '#38bdf8' }}>{formData.collegeName}</strong>
+                <span style={{ color: '#94a3b8' }}>Target Exam:</span>
+                <strong style={{ color: '#c084fc' }}>{formData.targetExam}</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ color: '#94a3b8' }}>Intermediate Year:</span>
-                <strong style={{ color: '#cbd5e1' }}>Year {formData.intermediateYear} ({formData.board})</strong>
+                <span style={{ color: '#94a3b8' }}>Engineering Interest:</span>
+                <strong style={{ color: '#38bdf8' }}>{formData.engineeringInterests}</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ color: '#94a3b8' }}>Target Exam & Branch:</span>
-                <strong style={{ color: '#c084fc' }}>{formData.targetExam} — {formData.targetBranch}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#94a3b8' }}>Location:</span>
                 <strong style={{ color: '#cbd5e1' }}>{formData.city}, {formData.state}</strong>
               </div>
+              {formData.isMinor && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#94a3b8' }}>Guardian Safeguard:</span>
+                  <strong style={{ color: '#10b981' }}>{formData.guardianName} (Consent Verified ✓)</strong>
+                </div>
+              )}
             </div>
 
             <button onClick={() => navigate('/dashboard')} className="btn-primary" style={{ padding: '0.85rem 2.5rem', fontSize: '1rem' }}>

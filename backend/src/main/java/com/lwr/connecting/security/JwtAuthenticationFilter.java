@@ -47,7 +47,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 // Enforce Server-Side Onboarding State Security for Protected Student Endpoints
                 String path = request.getRequestURI();
-                if (!path.startsWith("/api/auth/") && !path.startsWith("/api/admin/auth/") && !path.startsWith("/api/colleges") && !path.startsWith("/api/cutoffs") && !path.startsWith("/api/exams") && !path.startsWith("/api/branches")) {
+                if (!path.startsWith("/api/auth/") && !path.startsWith("/api/admin/auth/") && !path.startsWith("/health") && !path.startsWith("/api/health") && !path.startsWith("/api/colleges") && !path.startsWith("/api/cutoffs") && !path.startsWith("/api/exams") && !path.startsWith("/api/branches")) {
                     User user = userRepository.findByEmail(email).orElse(null);
                     if (user != null) {
                         String role = user.getRoles().stream().findFirst().map(Role::getName).orElse("ROLE_STUDENT");

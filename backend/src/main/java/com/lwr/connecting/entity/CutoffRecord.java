@@ -14,7 +14,7 @@ public class CutoffRecord {
     @Column(nullable = false)
     private String exam;
 
-    @Column(name = "\"year\"", nullable = false)
+    @Column(name = "cutoff_year", nullable = false)
     private Integer year;
 
     @Column(nullable = false)

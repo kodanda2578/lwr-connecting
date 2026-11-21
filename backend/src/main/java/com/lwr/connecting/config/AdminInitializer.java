@@ -48,7 +48,7 @@ public class AdminInitializer implements CommandLineRunner {
                 .orElseGet(() -> roleRepository.save(Role.builder().name("ROLE_ADMIN").build()));
 
         // Also ensure ROLE_STUDENT exists
-        roleRepository.findByName("ROLE_STUDENT")
+        Role studentRole = roleRepository.findByName("ROLE_STUDENT")
                 .orElseGet(() -> roleRepository.save(Role.builder().name("ROLE_STUDENT").build()));
 
         if (!userRepository.existsByEmail(adminEmail)) {
@@ -65,6 +65,36 @@ public class AdminInitializer implements CommandLineRunner {
 
             userRepository.save(admin);
             logger.info("[ADMIN SEED] Seeded initial Admin user: {}", adminEmail);
+        }
+
+        if (!userRepository.existsByEmail("student.demo@lwrconnecting.com")) {
+            com.lwr.connecting.entity.StudentProfile profile = com.lwr.connecting.entity.StudentProfile.builder()
+                    .collegeName("IIT Madras")
+                    .intermediateYear(2)
+                    .board("CBSE")
+                    .targetExam("JEE_MAIN")
+                    .targetBranch("Computer Science")
+                    .state("Andhra Pradesh")
+                    .city("Visakhapatnam")
+                    .preferredLocation("Visakhapatnam")
+                    .profileCompleted(true)
+                    .build();
+
+            User student = User.builder()
+                    .fullName("Student Demo")
+                    .email("student.demo@lwrconnecting.com")
+                    .mobileNumber("9876543210")
+                    .passwordHash(passwordEncoder.encode("Password123!"))
+                    .emailVerified(true)
+                    .mobileVerified(true)
+                    .accountStatus("ACTIVE")
+                    .roles(Collections.singleton(studentRole))
+                    .profile(profile)
+                    .build();
+
+            profile.setUser(student);
+            userRepository.save(student);
+            logger.info("[STUDENT SEED] Seeded initial Student Demo user: student.demo@lwrconnecting.com");
         }
     }
 }

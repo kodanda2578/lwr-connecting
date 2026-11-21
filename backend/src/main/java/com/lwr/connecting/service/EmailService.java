@@ -12,4 +12,9 @@ public interface EmailService {
     void sendMentorReplyEmail(String recipientEmail, String studentName, String replyPreview, String idempotencyKey);
     void sendDoubtSessionEmail(String recipientEmail, String studentName, String topic, String date, String time, String status, String idempotencyKey);
     void sendMentorNotificationEmail(String mentorEmail, String studentName, String category, String studentQuestion, String aiSummary, Long requestId, String idempotencyKey);
+    boolean sendAppointmentConfirmationEmail(String recipientEmail, String studentName, String topic, java.time.LocalDate appointmentDate, java.time.LocalTime startTime, java.time.LocalTime endTime, String timeZone, Long requestId, String meetingUrl, String idempotencyKey);
+    boolean sendAppointmentRescheduledEmail(String recipientEmail, String studentName, String topic, java.time.LocalDate newDate, java.time.LocalTime newStartTime, java.time.LocalTime newEndTime, String timeZone, Long requestId, String meetingUrl, java.time.LocalDate oldDate, java.time.LocalTime oldStartTime, String idempotencyKey);
+    boolean sendAppointmentCancelledEmail(String recipientEmail, String studentName, String topic, Long requestId, String reason, String idempotencyKey);
+    java.util.Map<String, Object> getEmailHealthStatus();
+    java.util.Map<String, Object> testSmtpConnection(String testRecipient);
 }

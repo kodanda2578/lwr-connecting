@@ -140,9 +140,9 @@ export const LoginPage = () => {
     setInfo('');
     setLoading(true);
     if (role === 'ADMIN') {
-      setEmail('admin@lwr.com');
-      setPassword('Admin@123');
-      const res = await login('admin@lwr.com', 'Admin@123');
+      setEmail('admin@lwrconnecting.com');
+      setPassword('Admin@LWR2026!');
+      const res = await login('admin@lwrconnecting.com', 'Admin@LWR2026!');
       setLoading(false);
       if (res.success) navigate('/admin');
       else setError(res.error || 'Admin login failed');

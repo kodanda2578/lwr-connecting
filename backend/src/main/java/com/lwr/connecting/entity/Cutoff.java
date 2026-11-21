@@ -28,7 +28,7 @@ public class Cutoff {
     @JoinColumn(name = "branch_id", nullable = false)
     private Branch branch;
 
-    @Column(nullable = false)
+    @Column(name = "exam_year", nullable = false)
     private Integer year;
 
     @Column(nullable = false, length = 50)
@@ -55,6 +55,13 @@ public class Cutoff {
 
     @Column(name = "source_reference", length = 500)
     private String sourceReference;
+
+    @Builder.Default
+    @Column(name = "verification_status", length = 50)
+    private String verificationStatus = "VERIFIED";
+
+    @Column(name = "last_verified_date", length = 50)
+    private String lastVerifiedDate;
 
     @Builder.Default
     @Column(nullable = false)

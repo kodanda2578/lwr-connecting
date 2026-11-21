@@ -108,9 +108,9 @@ export const Footer = () => {
             © {new Date().getFullYear()} <strong>Laughs With Ramesh Connecting</strong>. All rights reserved.
           </div>
           <div style={{ display: 'flex', gap: '1.5rem' }}>
-            <span>Privacy Policy</span>
-            <span>Terms of Service</span>
-            <span>Data Sources & Attribution</span>
+            <Link to="/privacy" style={{ color: '#06b6d4', fontWeight: 600 }}>Privacy & Minor Safeguards</Link>
+            <Link to="/terms" style={{ color: '#06b6d4', fontWeight: 600 }}>Terms of Service</Link>
+            <span style={{ color: '#64748b' }}>Data Sources & Attribution</span>
           </div>
         </div>
       </div>

@@ -1,14 +1,27 @@
 import { COLLEGES_DATA, CUTOFFS_DATA, BRANCHES_DATA, MOCK_TESTS_DATA, STUDY_MATERIALS_DATA, VIDEOS_DATA, COMMUNITY_POSTS_DATA } from '../data/sampleData';
+import { API_BASE_URL, buildApiUrl } from '../config/appConfig';
 
-const BASE_URL = '/api';
+export { API_BASE_URL, buildApiUrl };
 
-const getAuthHeader = () => {
+// Centralized API fetch helper that guarantees normalized dynamic backend URL routing
+export const apiFetch = (endpoint, options = {}) => {
+  return fetch(buildApiUrl(endpoint), options);
+};
+
+export const getAuthHeader = () => {
   try {
     const saved = localStorage.getItem('lwr_user');
     if (saved) {
       const parsed = JSON.parse(saved);
       if (parsed && parsed.token) {
         return { 'Authorization': `Bearer ${parsed.token}` };
+      }
+    }
+    const savedAdmin = localStorage.getItem('lwr_admin_user');
+    if (savedAdmin) {
+      const parsedAdmin = JSON.parse(savedAdmin);
+      if (parsedAdmin && parsedAdmin.token) {
+        return { 'Authorization': `Bearer ${parsedAdmin.token}` };
       }
     }
   } catch (e) {}
@@ -23,7 +36,7 @@ const safeFetch = async (url, options = {}, fallbackData = null) => {
       ...getAuthHeader(),
       ...(options.headers || {})
     };
-    const res = await fetch(`${BASE_URL}${url}`, { ...options, headers });
+    const res = await apiFetch(url, { ...options, headers });
     if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
     return await res.json();
   } catch (error) {
@@ -103,27 +116,19 @@ export const apiService = {
   },
 
   // LWR AI Assistant Chat Service
-  sendAiQuery: async (prompt, history = []) => {
-    const lower = prompt.toLowerCase();
-    let responseText = '';
-
-    if (lower.includes('cse') || lower.includes('ece') || lower.includes('branch')) {
-      responseText = `**CSE vs ECE Insight:**\n- **Computer Science & Engineering (CSE)** focuses on software engineering, algorithms, system design, and AI. High industry demand across top tech companies.\n- **Electronics & Communication (ECE)** bridges hardware circuits, microprocessors, signal processing, and communication networks. It offers flexibility into both core VLSI/Embedded systems and software IT roles.\n\n*Based on verified platform data. Source: LWR Branch Repository 2026.*`;
-    } else if (lower.includes('eapcet') || lower.includes('prepare') || lower.includes('math')) {
-      responseText = `**AP EAPCET Preparation Roadmap:**\n1. **Focus on Mathematics (80 Marks)**: High-weightage topics include Matrices (14%), Trigonometry (12%), and Vectors & 3D.\n2. **Physics & Chemistry (40 Marks each)**: Practice speed-solving formulas. AP EAPCET has no negative marking, so accuracy and speed are key.\n3. Take full 3-hour grand mock tests twice a week on our platform.`;
-    } else if (lower.includes('college') || lower.includes('au') || lower.includes('jntu')) {
-      responseText = `**College Insight:**\n- **Andhra University College of Engineering (AUCE)**: Premier Govt State University in Visakhapatnam. 2024 OC CSE closing rank was ~1250.\n- **JNTU Kakinada**: Renowned Govt University in Kakinada. 2024 OC CSE closing rank was ~1950.\n\n*Note: Historical cutoff data should be used for reference. Please check official APSCHE counselling notifications for final admissions.*`;
-    } else {
-      responseText = `Hello! I am **LWR AI**, your dedicated B.Tech & Entrance Exam Assistant.\n\nI can help you with:\n- High-weightage topics in JEE & AP EAPCET\n- Comparing branches (CSE, AI/ML, ECE, Mechanical)\n- Finding colleges matching your target rank\n- Strategy to improve your mock test scores!\n\nWhat would you like to explore today?`;
-    }
-
-    const payload = { response: responseText };
+  sendAiQuery: async (prompt, history = [], studentContext = {}) => {
+    const fallbackPayload = {
+      response: "Hi! 👋 Welcome to Laughs With Ramesh Connecting. I'm your LWR AI study and B.Tech guidance assistant. Are you studying Intermediate 1st year or 2nd year? And are you preparing for AP EAPCET, TG EAPCET, JEE Main, or another entrance exam?",
+      provider: "LWR_KNOWLEDGE_ENGINE",
+      suggestedChips: ["I'm in Intermediate 1st year", "I'm in Intermediate 2nd year", "AP EAPCET", "JEE Main"],
+      studentContext: studentContext
+    };
 
     return safeFetch('/ai/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, history })
-    }, payload);
+      body: JSON.stringify({ prompt, history, studentContext })
+    }, fallbackPayload);
   },
 
   // Exam Content System APIs
@@ -259,10 +264,14 @@ export const apiService = {
     return safeFetch(`/cutoffs${query}`, { method: 'GET' }, CUTOFFS_DATA);
   },
 
-  predictCollegesList: async (examId, rank, category = '', branchId = '') => {
+  predictCollegesList: async (examId, rank, category = '', branchId = '', homeState = '', gender = '', page = 0, size = 12) => {
     const params = new URLSearchParams({ examId, rank });
     if (category) params.append('category', category);
     if (branchId) params.append('branchId', branchId);
+    if (homeState) params.append('homeState', homeState);
+    if (gender) params.append('gender', gender);
+    if (page != null) params.append('page', page);
+    if (size != null) params.append('size', size);
     return safeFetch(`/cutoffs/predict?${params.toString()}`, { method: 'GET' }, []);
   },
 
@@ -330,5 +339,691 @@ export const apiService = {
     return safeFetch(`/admin/cutoffs/${id}`, {
       method: 'DELETE'
     }, null);
+  },
+
+  // Mock Tests & CBT Engine
+  getMockTests: async (examId = null, testType = 'ALL') => {
+    let url = '/mock-tests?';
+    if (examId) url += `examId=${examId}&`;
+    if (testType && testType !== 'ALL') url += `testType=${testType}&`;
+    return safeFetch(url, {}, []);
+  },
+
+  getMockTestById: async (id) => {
+    return safeFetch(`/mock-tests/${id}`, {}, null);
+  },
+
+  getMyAttempts: async () => {
+    return safeFetch('/mock-tests/my-attempts', {}, []);
+  },
+
+  generateMockTest: async (payload) => {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    };
+    const res = await apiFetch('/api/mock-tests/generate', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || err.error || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  generateGrandTest: async (examId, title = '') => {
+    const headers = {
+      ...getAuthHeader()
+    };
+    const query = title ? `&title=${encodeURIComponent(title)}` : '';
+    const res = await apiFetch(`/api/mock-tests/grand-test/generate?examId=${examId}${query}`, {
+      method: 'POST',
+      headers
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || err.error || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  startTestAttempt: async (testId) => {
+    const headers = {
+      ...getAuthHeader()
+    };
+    const res = await apiFetch(`/api/mock-tests/${testId}/start`, {
+      method: 'POST',
+      headers
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || err.error || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  submitTestAttempt: async (payload) => {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    };
+    const res = await apiFetch('/api/mock-tests/submit', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || err.error || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  getTestResult: async (attemptId) => {
+    const headers = {
+      ...getAuthHeader()
+    };
+    const res = await apiFetch(`/api/mock-tests/attempts/${attemptId}/result`, {
+      headers
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || err.error || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  // Student Guidance Requests & Appointments
+  submitGuidanceRequest: async (payload) => {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    };
+    const res = await apiFetch('/api/guidance-requests', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  getMyGuidanceRequests: async () => {
+    const headers = { ...getAuthHeader() };
+    const res = await apiFetch('/api/guidance-requests/my-requests', { headers });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  },
+
+  getMyGuidanceRequestById: async (id) => {
+    const headers = { ...getAuthHeader() };
+    const res = await apiFetch(`/api/guidance-requests/my-requests/${id}`, { headers });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  },
+
+  // Admin Guidance Request Management
+  getAdminGuidanceRequests: async (status = '') => {
+    const headers = { ...getAuthHeader() };
+    const url = status && status !== 'ALL' ? `/api/admin/guidance-requests?status=${status}` : '/api/admin/guidance-requests';
+    const res = await apiFetch(url, { headers });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  },
+
+  getAdminGuidanceStats: async () => {
+    const headers = { ...getAuthHeader() };
+    const res = await apiFetch('/api/admin/guidance-requests/stats', { headers });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  },
+
+  updateGuidanceStatus: async (id, status, adminResponse = '') => {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    };
+    const res = await apiFetch(`/api/admin/guidance-requests/${id}/status`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ status, adminResponse })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  scheduleAppointment: async (requestId, payload) => {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    };
+    const res = await apiFetch(`/api/admin/guidance-requests/${requestId}/schedule`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  rescheduleAppointment: async (appointmentId, payload) => {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    };
+    const res = await apiFetch(`/api/admin/guidance-requests/appointments/${appointmentId}/reschedule`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  cancelAppointment: async (appointmentId, reason = '') => {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    };
+    const res = await apiFetch(`/api/admin/guidance-requests/appointments/${appointmentId}/cancel`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ reason })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  // Notifications
+  getNotifications: async () => {
+    const headers = { ...getAuthHeader() };
+    const res = await apiFetch('/api/notifications', { headers });
+    if (!res.ok) return [];
+    return await res.json();
+  },
+
+  getUnreadNotificationCount: async () => {
+    const headers = { ...getAuthHeader() };
+    const res = await apiFetch('/api/notifications/unread-count', { headers });
+    if (!res.ok) return { unreadCount: 0 };
+    return await res.json();
+  },
+
+  markNotificationRead: async (id) => {
+    const headers = { ...getAuthHeader() };
+    const res = await apiFetch(`/api/notifications/${id}/read`, {
+      method: 'POST',
+      headers
+    });
+    return res.ok;
+  },
+
+  markAllNotificationsRead: async () => {
+    const headers = { ...getAuthHeader() };
+    const res = await apiFetch('/api/notifications/read-all', {
+      method: 'POST',
+      headers
+    });
+    return res.ok;
+  },
+
+  // College Suggestions & Data Ingestion
+  getCollegeSuggestions: async (query) => {
+    const res = await apiFetch(`/api/colleges/suggestions?q=${encodeURIComponent(query)}`);
+    if (!res.ok) return [];
+    return await res.json();
+  },
+
+  getDataIngestionStatus: async () => {
+    const res = await apiFetch('/api/data-ingestion/status');
+    if (!res.ok) return null;
+    return await res.json();
+  },
+
+  onlineCollegeSearch: async (query) => {
+    try {
+      const res = await apiFetch(`/api/colleges/online-search?q=${encodeURIComponent(query)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (e) {
+      return {
+        query,
+        count: 0,
+        results: [],
+        searchAvailable: false,
+        message: 'Online verified registry lookup is temporarily unavailable.'
+      };
+    }
+  },
+
+  adminDataImportPreview: async (payload) => {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    };
+    const res = await apiFetch('/api/admin/data-import/preview', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  adminDataImportCommit: async (payload) => {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    };
+    const res = await apiFetch('/api/admin/data-import/commit', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  retryAppointmentEmail: async (appointmentId) => {
+    const headers = {
+      ...getAuthHeader()
+    };
+    const res = await apiFetch(`/api/admin/guidance-requests/appointments/${appointmentId}/retry-email`, {
+      method: 'POST',
+      headers
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  // Beta Feedback Workflow
+  submitBetaFeedback: async (feedbackData) => {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    };
+    const res = await apiFetch('/api/feedback', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(feedbackData)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  getMyBetaFeedback: async () => {
+    const headers = { ...getAuthHeader() };
+    const res = await apiFetch('/api/feedback/my', { headers });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  getAdminBetaFeedback: async (status = '', category = '', severity = '') => {
+    const headers = { ...getAuthHeader() };
+    const params = new URLSearchParams();
+    if (status) params.append('status', status);
+    if (category) params.append('category', category);
+    if (severity) params.append('severity', severity);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    const res = await apiFetch(`/api/admin/feedback${query}`, { headers });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  getAdminBetaFeedbackStats: async () => {
+    const headers = { ...getAuthHeader() };
+    const res = await apiFetch('/api/admin/feedback/stats', { headers });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  updateAdminBetaFeedback: async (id, payload) => {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    };
+    const res = await apiFetch(`/api/admin/feedback/${id}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  deleteAdminBetaFeedback: async (id) => {
+    const headers = { ...getAuthHeader() };
+    const res = await apiFetch(`/api/admin/feedback/${id}`, {
+      method: 'DELETE',
+      headers
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  // Beta Access & Registration Controls
+  getBetaStatus: async () => {
+    try {
+      const res = await apiFetch('/api/beta/status');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (e) {
+      return {
+        betaActive: true,
+        registrationLimit: 100,
+        currentBetaCount: 50,
+        spotsRemaining: 50,
+        registrationsOpen: true,
+        registrationsPaused: false,
+        betaNoticeMessage: 'Welcome to the LWR Connecting Beta for Intermediate Class 11 and Class 12 students. Limited to 100 students.',
+        targetAudienceNotice: 'Class 11 & Class 12 Intermediate (MPC) Engineering Aspirants',
+        guardianConsentRequired: true
+      };
+    }
+  },
+
+  getAdminBetaConfig: async () => {
+    const headers = { ...getAuthHeader() };
+    const res = await apiFetch('/api/beta/admin/config', { headers });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  updateAdminBetaConfig: async (payload) => {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    };
+    const res = await apiFetch('/api/beta/admin/config', {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  getAdminBetaAnalytics: async () => {
+    const headers = { ...getAuthHeader() };
+    const res = await apiFetch('/api/beta/admin/analytics', { headers });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  requestDataDeletion: async (reason = 'Student or Guardian request') => {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    };
+    const res = await apiFetch('/api/beta/request-deletion', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ reason })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  // Beta Launch Operations & Diagnostics
+  getLaunchOverview: async () => {
+    const headers = { ...getAuthHeader() };
+    const res = await apiFetch('/api/beta/admin/launch-overview', { headers });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  getConfigurationHealth: async () => {
+    const headers = { ...getAuthHeader() };
+    const res = await apiFetch('/api/beta/admin/health', { headers });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  testSmtpConnection: async (recipient) => {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    };
+    const res = await apiFetch('/api/beta/admin/health/test-smtp', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ recipient })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  testGeminiConnection: async () => {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    };
+    const res = await apiFetch('/api/beta/admin/health/test-gemini', {
+      method: 'POST',
+      headers
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  createDatabaseBackup: async () => {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    };
+    const res = await apiFetch('/api/beta/admin/backup/create', {
+      method: 'POST',
+      headers
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  listDatabaseBackups: async () => {
+    const headers = { ...getAuthHeader() };
+    const res = await apiFetch('/api/beta/admin/backup/list', { headers });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  verifyDatabaseBackup: async (fileName) => {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    };
+    const res = await apiFetch('/api/beta/admin/backup/verify', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ fileName })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  getPendingDeletionRequests: async () => {
+    const headers = { ...getAuthHeader() };
+    const res = await apiFetch('/api/beta/admin/deletion-requests', { headers });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  processAccountDeletion: async (userId, notes = 'Approved and expunged') => {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    };
+    const res = await apiFetch(`/api/beta/admin/deletion-requests/${userId}/process`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ notes })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  // Wave 1 Invitation Management
+  validateInviteCode: async (code, email = '') => {
+    const url = `/api/beta/validate-invite?code=${encodeURIComponent(code)}${email ? `&email=${encodeURIComponent(email)}` : ''}`;
+    const res = await apiFetch(url);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { valid: false, reason: err.error || err.message || `HTTP ${res.status}` };
+    }
+    return await res.json();
+  },
+
+  listInvitations: async (status = 'ALL') => {
+    const headers = { ...getAuthHeader() };
+    const res = await apiFetch(`/api/beta/admin/invitations?status=${encodeURIComponent(status)}`, { headers });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  getInvitationStats: async () => {
+    const headers = { ...getAuthHeader() };
+    const res = await apiFetch('/api/beta/admin/invitations/stats', { headers });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  createInvitation: async (payload) => {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    };
+    const res = await apiFetch('/api/beta/admin/invitations/create', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  batchGenerateInvitations: async (payload) => {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    };
+    const res = await apiFetch('/api/beta/admin/invitations/batch', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  revokeInvitation: async (id) => {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    };
+    const res = await apiFetch(`/api/beta/admin/invitations/${id}/revoke`, {
+      method: 'POST',
+      headers
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    return await res.json();
   }
 };
+

@@ -38,6 +38,8 @@ import { DirectMessagingPage } from './pages/DirectMessagingPage';
 import { DoubtSessionPage } from './pages/DoubtSessionPage';
 import { CommunityPage } from './pages/CommunityPage';
 import { AdminDashboard } from './pages/AdminDashboard';
+import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
+import { BetaFeedbackPage } from './pages/BetaFeedbackPage';
 
 export function App() {
   return (
@@ -51,6 +53,8 @@ export function App() {
               <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
+              <Route path="/privacy" element={<PrivacyPolicyPage />} />
+              <Route path="/terms" element={<PrivacyPolicyPage />} />
 
               {/* Dedicated Admin Public Login */}
               <Route path="/admin/login" element={<AdminLoginPage />} />
@@ -73,6 +77,7 @@ export function App() {
               <Route path="/compare" element={<CollegeComparePage />} />
               <Route path="/cutoffs" element={<CutoffExplorerPage />} />
               <Route path="/college-predictor" element={<CollegePredictorPage />} />
+              <Route path="/predictor" element={<CollegePredictorPage />} />
               <Route path="/btech-roadmap" element={<BTechRoadmapPage />} />
               <Route path="/community" element={<CommunityPage />} />
 
@@ -111,11 +116,7 @@ export function App() {
               />
               <Route 
                 path="/ai-assistant" 
-                element={
-                  <ProtectedRoute>
-                    <AiAssistantPage />
-                  </ProtectedRoute>
-                } 
+                element={<AiAssistantPage />} 
               />
               <Route 
                 path="/messages" 
@@ -130,6 +131,30 @@ export function App() {
                 element={
                   <ProtectedRoute>
                     <DoubtSessionPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/doubt-session" 
+                element={
+                  <ProtectedRoute>
+                    <DoubtSessionPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/connect-with-ramesh" 
+                element={
+                  <ProtectedRoute>
+                    <DoubtSessionPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/feedback" 
+                element={
+                  <ProtectedRoute>
+                    <BetaFeedbackPage />
                   </ProtectedRoute>
                 } 
               />

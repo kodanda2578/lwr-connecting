@@ -8,6 +8,7 @@ import com.lwr.connecting.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
@@ -17,6 +18,9 @@ import java.util.List;
 public class ExamDataInitializer implements CommandLineRunner {
 
     private static final Logger logger = LoggerFactory.getLogger(ExamDataInitializer.class);
+
+    @Value("${exam.seed.enabled:false}")
+    private boolean seedEnabled;
 
     @Autowired
     private StateRepository stateRepository;
@@ -53,6 +57,10 @@ public class ExamDataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
+        if (!seedEnabled) {
+            logger.info("[INITIALIZER] Exam seeding is disabled.");
+            return;
+        }
         logger.info("[INITIALIZER] Starting Exam Content Audit & Synchronization...");
         seedStates();
         seedExams();
@@ -634,15 +642,19 @@ public class ExamDataInitializer implements CommandLineRunner {
                     .code("AUCE")
                     .name("Andhra University College of Engineering")
                     .state(ap)
+                    .location("Andhra University Campus, Visakhapatnam, Andhra Pradesh")
+                    .stateText("Andhra Pradesh")
                     .city("Visakhapatnam")
                     .district("Visakhapatnam")
                     .website("https://www.andhrauniversity.edu.in")
                     .admissionAuthority("APSCHE (AP EAPCET)")
                     .governmentStatus("Government")
                     .collegeType("Autonomous University College")
+                    .typeCode("Government")
                     .isAutonomous(true)
                     .description("Premier State University Engineering College established in 1955.")
                     .sourceReference("APSCHE Official AP EAPCET Seat Matrix")
+                    .source("APSCHE Official AP EAPCET Seat Matrix")
                     .active(true)
                     .build());
             if (apEapcet != null) collegeExamMappingRepository.save(CollegeExamMapping.builder().college(auce).exam(apEapcet).notes("Convenor Quota via AP EAPCET").build());
@@ -655,15 +667,19 @@ public class ExamDataInitializer implements CommandLineRunner {
                     .code("JNTUH")
                     .name("JNTU College of Engineering, Hyderabad")
                     .state(ts)
+                    .location("Kukatpally, Hyderabad, Telangana")
+                    .stateText("Telangana")
                     .city("Hyderabad")
                     .district("Hyderabad")
                     .website("https://jntuhceh.ac.in")
                     .admissionAuthority("TSCHE (TS EAMCET)")
                     .governmentStatus("Government")
                     .collegeType("State University Constituent College")
+                    .typeCode("Government")
                     .isAutonomous(true)
                     .description("Leading Government Engineering College in Telangana.")
                     .sourceReference("TSCHE Official TS EAMCET Counselling Portal")
+                    .source("TSCHE Official TS EAMCET Counselling Portal")
                     .active(true)
                     .build());
             if (tsEamcet != null) collegeExamMappingRepository.save(CollegeExamMapping.builder().college(jntuh).exam(tsEamcet).notes("Convenor Quota via TS EAMCET").build());
@@ -676,15 +692,19 @@ public class ExamDataInitializer implements CommandLineRunner {
                     .code("RVCE")
                     .name("RV College of Engineering")
                     .state(ka)
+                    .location("Mysuru Road, Bengaluru, Karnataka")
+                    .stateText("Karnataka")
                     .city("Bengaluru")
                     .district("Bengaluru Urban")
                     .website("https://www.rvce.edu.in")
                     .admissionAuthority("Karnataka Examinations Authority (KEA)")
                     .governmentStatus("Private Aided")
                     .collegeType("Autonomous College affiliated to VTU")
+                    .typeCode("Private")
                     .isAutonomous(true)
                     .description("Top-ranked engineering institution in Karnataka established in 1963.")
                     .sourceReference("KEA Official KCET Seat Matrix")
+                    .source("KEA Official KCET Seat Matrix")
                     .active(true)
                     .build());
             if (kcet != null) collegeExamMappingRepository.save(CollegeExamMapping.builder().college(rvce).exam(kcet).notes("KEA Government Quota").build());
@@ -697,15 +717,19 @@ public class ExamDataInitializer implements CommandLineRunner {
                     .code("COEP")
                     .name("COEP Technological University")
                     .state(mh)
+                    .location("Wellesely Road, Shivajinagar, Pune, Maharashtra")
+                    .stateText("Maharashtra")
                     .city("Pune")
                     .district("Pune")
                     .website("https://www.coep.org.in")
                     .admissionAuthority("State CET Cell Maharashtra (MHT-CET)")
                     .governmentStatus("Government")
                     .collegeType("Unitary Public University")
+                    .typeCode("Government")
                     .isAutonomous(true)
                     .description("Third oldest engineering college in Asia established in 1854.")
                     .sourceReference("MHT-CET Official CAP Allotment Matrix")
+                    .source("MHT-CET Official CAP Allotment Matrix")
                     .active(true)
                     .build());
             if (mhtCet != null) collegeExamMappingRepository.save(CollegeExamMapping.builder().college(coep).exam(mhtCet).notes("MHT-CET CAP Rounds").build());
@@ -718,15 +742,19 @@ public class ExamDataInitializer implements CommandLineRunner {
                     .code("JU")
                     .name("Jadavpur University Faculty of Engineering")
                     .state(wb)
+                    .location("188 Raja S.C. Mallick Road, Kolkata, West Bengal")
+                    .stateText("West Bengal")
                     .city("Kolkata")
                     .district("Kolkata")
                     .website("http://www.jaduniv.edu.in")
                     .admissionAuthority("WBJEEB (WBJEE)")
                     .governmentStatus("Government")
                     .collegeType("State University Faculty")
+                    .typeCode("Government")
                     .isAutonomous(true)
                     .description("Premier State University in West Bengal known for world-class engineering education.")
                     .sourceReference("WBJEEB Official WBJEE Counselling Matrix")
+                    .source("WBJEEB Official WBJEE Counselling Matrix")
                     .active(true)
                     .build());
             if (wbjee != null) collegeExamMappingRepository.save(CollegeExamMapping.builder().college(ju).exam(wbjee).notes("WBJEE State Quota").build());
@@ -738,15 +766,19 @@ public class ExamDataInitializer implements CommandLineRunner {
                     .code("CEG")
                     .name("College of Engineering Guindy, Anna University")
                     .state(tn)
+                    .location("Sardar Patel Road, Guindy, Chennai, Tamil Nadu")
+                    .stateText("Tamil Nadu")
                     .city("Chennai")
                     .district("Chennai")
                     .website("https://ceg.annauniv.edu")
                     .admissionAuthority("Directorate of Technical Education (TNEA)")
                     .governmentStatus("Government")
                     .collegeType("University Campus")
+                    .typeCode("Government")
                     .isAutonomous(true)
                     .description("Oldest technical institution in India established in 1794.")
                     .sourceReference("DoTE Tamil Nadu TNEA Admission Portal")
+                    .source("DoTE Tamil Nadu TNEA Admission Portal")
                     .active(true)
                     .build());
             if (tnea != null) collegeExamMappingRepository.save(CollegeExamMapping.builder().college(ceg).exam(tnea).notes("TNEA Single Window Counselling based on Class 12 Marks").build());
@@ -758,15 +790,19 @@ public class ExamDataInitializer implements CommandLineRunner {
                     .code("CET")
                     .name("College of Engineering Trivandrum")
                     .state(kl)
+                    .location("College of Engineering P.O., Thiruvananthapuram, Kerala")
+                    .stateText("Kerala")
                     .city("Thiruvananthapuram")
                     .district("Thiruvananthapuram")
                     .website("https://www.cet.ac.in")
                     .admissionAuthority("Commissioner for Entrance Examinations (CEE Kerala)")
                     .governmentStatus("Government")
                     .collegeType("Government Autonomous College")
+                    .typeCode("Government")
                     .isAutonomous(true)
                     .description("First engineering college in Travancore State established in 1939.")
                     .sourceReference("CEE Kerala KEAM Official Allotment")
+                    .source("CEE Kerala KEAM Official Allotment")
                     .active(true)
                     .build());
             if (keam != null) collegeExamMappingRepository.save(CollegeExamMapping.builder().college(cet).exam(keam).notes("KEAM Centralized Allotment Process").build());
@@ -778,15 +814,19 @@ public class ExamDataInitializer implements CommandLineRunner {
                     .code("LDCE")
                     .name("L.D. College of Engineering")
                     .state(gj)
+                    .location("Navrangpura, Ahmedabad, Gujarat")
+                    .stateText("Gujarat")
                     .city("Ahmedabad")
                     .district("Ahmedabad")
                     .website("https://ldce.ac.in")
                     .admissionAuthority("ACPC Gujarat (GUJCET / JEE Main)")
                     .governmentStatus("Government")
                     .collegeType("Government Engineering College")
+                    .typeCode("Government")
                     .isAutonomous(false)
                     .description("Premier Government Engineering College in Gujarat established in 1948.")
                     .sourceReference("ACPC Gujarat Official Admission Committee")
+                    .source("ACPC Gujarat Official Admission Committee")
                     .active(true)
                     .build());
             if (gujcet != null) collegeExamMappingRepository.save(CollegeExamMapping.builder().college(ldce).exam(gujcet).notes("ACPC Gujarat Merit Quota").build());

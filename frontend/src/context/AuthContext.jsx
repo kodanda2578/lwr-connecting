@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
+import { buildApiUrl } from '../config/appConfig';
 
 const AuthContext = createContext();
 
@@ -61,7 +62,7 @@ export const AuthProvider = ({ children }) => {
   // Student Login Function (Step 1: Credentials check)
   const login = async (email, password) => {
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch(buildApiUrl('/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
@@ -122,7 +123,7 @@ export const AuthProvider = ({ children }) => {
   // Student Verify Login OTP (Step 2: OTP verification)
   const verifyLoginOtp = async (userId, otp) => {
     try {
-      const response = await fetch('/api/auth/verify-login-otp', {
+      const response = await fetch(buildApiUrl('/auth/verify-login-otp'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: userId.toString(), otp })
@@ -161,7 +162,7 @@ export const AuthProvider = ({ children }) => {
   // Resend Login OTP
   const sendLoginOtp = async (userId) => {
     try {
-      const response = await fetch('/api/auth/send-login-otp', {
+      const response = await fetch(buildApiUrl('/auth/send-login-otp'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId })
@@ -180,7 +181,7 @@ export const AuthProvider = ({ children }) => {
   // Dedicated Admin Login Function
   const adminLogin = async (email, password) => {
     try {
-      const response = await fetch('/api/admin/auth/login', {
+      const response = await fetch(buildApiUrl('/admin/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })

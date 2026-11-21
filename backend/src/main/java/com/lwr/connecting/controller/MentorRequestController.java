@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 @RestController
-@RequestMapping("/mentor-requests")
+@RequestMapping({"/mentor-requests", "/api/mentor-requests"})
 public class MentorRequestController {
 
     @Autowired
@@ -39,6 +39,13 @@ public class MentorRequestController {
         }
 
         User student = userRepository.findByEmail(authentication.getName()).orElseThrow();
+
+        if (student.getProfile() != null && Boolean.TRUE.equals(student.getProfile().getIsMinor())
+                && !Boolean.TRUE.equals(student.getProfile().getGuardianConsentGiven())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Parent/Guardian consent is required before intermediate minor students can submit mentorship requests."));
+        }
+
         String category = body.getOrDefault("category", "General Doubt").toString();
         String studentMessage = body.getOrDefault("studentMessage", "").toString();
         String exam = body.getOrDefault("exam", "AP_EAPCET").toString();

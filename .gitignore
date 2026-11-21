@@ -5,11 +5,15 @@ frontend/dist/
 dist/
 backend/apache-maven-3.9.6/
 *.zip
+*.class
 
 # Database files
 backend/data/
 *.mv.db
 *.db
+data_export/
+backend/data/export/
+*.csv
 
 # Node dependencies
 node_modules/
@@ -18,6 +22,7 @@ frontend/node_modules/
 # Environment and Secrets
 .env
 .env.*
+!.env.example
 *.env
 
 # IDE and OS
@@ -26,3 +31,8 @@ frontend/node_modules/
 .DS_Store
 *.log
 scratch/
+
+# Local backups and temporary test scripts
+startup_safety_backup_*/
+migration_backup_*/
+test_email_workflow.mjs

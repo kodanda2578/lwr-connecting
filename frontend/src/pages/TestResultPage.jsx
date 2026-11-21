@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { Award, CheckCircle2, XCircle, Clock, ArrowRight, Sparkles, Building2, BarChart3, HelpCircle, Layers, ShieldCheck, Cpu } from 'lucide-react';
+import { apiService } from '../services/apiService';
 
 export const TestResultPage = () => {
   const { id } = useParams();
@@ -19,9 +20,9 @@ export const TestResultPage = () => {
   const fetchResult = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/mock-tests/attempts/${id}/result`);
-      if (res.ok) {
-        setResultData(await res.json());
+      const data = await apiService.getTestResult(id);
+      if (data) {
+        setResultData(data);
       }
     } catch (e) {
       console.error(e);

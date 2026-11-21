@@ -20,20 +20,14 @@ public class CollegeController {
     @Autowired
     private CutoffRecordRepository cutoffRecordRepository;
 
-    @GetMapping
-    public List<College> getAllColleges() {
-        return collegeRepository.findAll();
-    }
-
-    @GetMapping("/{id}")
-    public ResponseEntity<College> getCollegeById(@PathVariable Long id) {
-        return collegeRepository.findById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
-    }
+    @Autowired(required = false)
+    private com.lwr.connecting.service.BetaAccessService betaAccessService;
 
     @PostMapping("/predictor")
     public ResponseEntity<List<Map<String, Object>>> predictColleges(@RequestBody Map<String, Object> request) {
+        if (betaAccessService != null) {
+            betaAccessService.recordPredictorUsage();
+        }
         String exam = (String) request.getOrDefault("exam", "AP_EAPCET");
         Integer rank = Integer.parseInt(request.getOrDefault("rank", "5000").toString());
         String category = (String) request.getOrDefault("category", "OC_BOYS");

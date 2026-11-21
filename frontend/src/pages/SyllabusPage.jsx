@@ -44,7 +44,7 @@ export const SyllabusPage = () => {
   const completionPercentage = totalTopicsCount > 0 ? Math.round((completedCount / totalTopicsCount) * 100) : 0;
 
   return (
-    <div style={{ padding: '3rem 0 5rem 0' }}>
+    <div className="page-wrapper">
       <div className="container">
         
         {/* Header */}

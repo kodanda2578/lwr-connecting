@@ -13,6 +13,8 @@ import {
   AlertTriangle,
   Play
 } from 'lucide-react';
+import { apiService } from '../services/apiService';
+import { buildApiUrl } from '../config/appConfig';
 
 export default function AdminTestManager() {
   const [tests, setTests] = useState([]);
@@ -52,7 +54,7 @@ export default function AdminTestManager() {
 
   useEffect(() => {
     if (selectedExamId) {
-      fetch(`/api/subjects?examId=${selectedExamId}`)
+      fetch(buildApiUrl(`/subjects?examId=${selectedExamId}`))
         .then(res => res.json())
         .then(data => setSubjects(data))
         .catch(() => {});
@@ -61,7 +63,7 @@ export default function AdminTestManager() {
 
   useEffect(() => {
     if (selectedSubjectId) {
-      fetch(`/api/topics?subjectId=${selectedSubjectId}`)
+      fetch(buildApiUrl(`/topics?subjectId=${selectedSubjectId}`))
         .then(res => res.json())
         .then(data => setTopics(data))
         .catch(() => {});
@@ -72,9 +74,9 @@ export default function AdminTestManager() {
     setLoading(true);
     try {
       const [testsRes, examsRes, valRes] = await Promise.all([
-        fetch('/api/admin/tests'),
-        fetch('/api/exams'),
-        fetch('/api/admin/tests/validations')
+        fetch(buildApiUrl('/admin/tests')),
+        fetch(buildApiUrl('/exams')),
+        fetch(buildApiUrl('/admin/tests/validations'))
       ]);
 
       if (testsRes.ok) setTests(await testsRes.json());
@@ -105,7 +107,7 @@ export default function AdminTestManager() {
         aiProvider
       };
 
-      const res = await fetch('/api/admin/tests/create', {
+      const res = await fetch(buildApiUrl('/admin/tests/create'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -125,7 +127,7 @@ export default function AdminTestManager() {
 
   const handleToggleStatus = async (testId) => {
     try {
-      const res = await fetch(`/api/admin/tests/${testId}/toggle`, { method: 'POST' });
+      const res = await fetch(buildApiUrl(`/admin/tests/${testId}/toggle`), { method: 'POST' });
       if (res.ok) {
         fetchInitialData();
       }
@@ -140,10 +142,10 @@ export default function AdminTestManager() {
     }
     setIsGenerating(true);
     try {
-      let url = `/api/admin/tests/generate-ai-questions?examId=${aiGenExamId}&subjectId=${aiGenSubjectId}&count=${aiGenCount}&provider=${aiGenProvider}&difficulty=${aiGenDiff}`;
+      let url = `/admin/tests/generate-ai-questions?examId=${aiGenExamId}&subjectId=${aiGenSubjectId}&count=${aiGenCount}&provider=${aiGenProvider}&difficulty=${aiGenDiff}`;
       if (aiGenTopicId) url += `&topicId=${aiGenTopicId}`;
 
-      const res = await fetch(url, { method: 'POST' });
+      const res = await fetch(buildApiUrl(url), { method: 'POST' });
       if (res.ok) {
         const generated = await res.json();
         alert(`Successfully generated and validated ${generated.length} AI questions in Question Bank!`);
@@ -160,12 +162,12 @@ export default function AdminTestManager() {
 
   const handleGenerateGrandTest = async (examId) => {
     try {
-      const res = await fetch(`/api/mock-tests/grand-test/generate?examId=${examId}`, { method: 'POST' });
-      if (res.ok) {
-        alert('Official Pattern Grand Test generated & published!');
-        fetchInitialData();
-      }
-    } catch (err) {}
+      await apiService.generateGrandTest(examId);
+      alert('Official Pattern Grand Test generated & published!');
+      fetchInitialData();
+    } catch (err) {
+      alert('Failed to generate Grand Test: ' + (err.message || ''));
+    }
   };
 
   return (

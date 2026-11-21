@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Clock, CheckCircle2, ArrowRight, ArrowLeft, Flag, Maximize2, Minimize2, AlertTriangle, ShieldAlert, X } from 'lucide-react';
+import { apiService } from '../services/apiService';
 
 export const MockTestEngine = () => {
   const { id } = useParams();
@@ -25,9 +26,8 @@ export const MockTestEngine = () => {
   const fetchTestData = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/mock-tests/${id}`);
-      if (res.ok) {
-        const data = await res.json();
+      const data = await apiService.getMockTestById(id);
+      if (data) {
         setTestData(data);
         setTimeLeft(data.durationMinutes * 60);
       }
@@ -73,17 +73,12 @@ export const MockTestEngine = () => {
   // 4. Start CBT Attempt
   const handleStartCBT = async () => {
     try {
-      const res = await fetch(`/api/mock-tests/${id}/start`, { method: 'POST' });
-      if (res.ok) {
-        const attemptData = await res.json();
-        setAttempt(attemptData);
-        setTestStarted(true);
-      } else {
-        alert('Please log in to take mock tests');
-        navigate('/login');
-      }
+      const attemptData = await apiService.startTestAttempt(id);
+      setAttempt(attemptData);
+      setTestStarted(true);
     } catch (err) {
-      alert('Failed to connect to test server.');
+      alert('Please log in with an active student account to take mock tests.');
+      navigate('/login');
     }
   };
 
@@ -148,24 +143,14 @@ export const MockTestEngine = () => {
     const totalTimeSpentSeconds = (testData.durationMinutes * 60) - timeLeft;
 
     try {
-      const res = await fetch('/api/mock-tests/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          attemptId: attempt.id,
-          totalTimeSpentSeconds,
-          answers: answersList
-        })
+      const resultPayload = await apiService.submitTestAttempt({
+        attemptId: attempt.id,
+        totalTimeSpentSeconds,
+        answers: answersList
       });
-
-      if (res.ok) {
-        const resultPayload = await res.json();
-        navigate(`/mock-tests/attempts/${attempt.id}/result`, { state: { resultPayload } });
-      } else {
-        alert('Failed to evaluate test submission.');
-      }
+      navigate(`/mock-tests/attempts/${attempt.id}/result`, { state: { resultPayload } });
     } catch (e) {
-      alert('Network error while submitting test.');
+      alert('Failed to evaluate test submission: ' + (e.message || ''));
     }
   };
 
@@ -234,14 +219,17 @@ export const MockTestEngine = () => {
     <div style={{ background: '#04070f', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       
       {/* Test Engine Header */}
-      <header style={{
-        background: '#090d1a',
-        borderBottom: '1px solid rgba(255,255,255,0.1)',
-        padding: '0.85rem 2rem',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
+      <header 
+        className="cbt-header"
+        style={{
+          background: '#090d1a',
+          borderBottom: '1px solid rgba(255,255,255,0.1)',
+          padding: '0.85rem 2rem',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}
+      >
         <div>
           <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#ffffff' }}>{testData.title}</div>
           <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
@@ -249,7 +237,7 @@ export const MockTestEngine = () => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
           <button 
             onClick={toggleFullscreen} 
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#ffffff', padding: '0.5rem 0.85rem', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem' }}>
@@ -259,29 +247,29 @@ export const MockTestEngine = () => {
           <div style={{
             background: timeLeft < 300 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(6, 182, 212, 0.15)',
             border: timeLeft < 300 ? '1px solid #ef4444' : '1px solid #06b6d4',
-            padding: '0.5rem 1.25rem',
+            padding: '0.5rem 1rem',
             borderRadius: '8px',
             color: timeLeft < 300 ? '#f87171' : '#06b6d4',
             fontWeight: 800,
-            fontSize: '1.1rem',
+            fontSize: '1rem',
             display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem'
+            gap: '0.4rem'
           }}>
-            <Clock size={20} /> {formatTime(timeLeft)}
+            <Clock size={18} /> {formatTime(timeLeft)}
           </div>
 
-          <button onClick={() => handleSubmitTest(false)} className="btn-accent" style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem' }}>
+          <button onClick={() => handleSubmitTest(false)} className="btn-accent" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
             Submit Exam
           </button>
         </div>
       </header>
 
       {/* CBT Body */}
-      <div style={{ flex: 1, display: 'flex' }}>
+      <div className="cbt-body" style={{ flex: 1, display: 'flex' }}>
         
         {/* Left Main Question Canvas */}
-        <div style={{ flex: 1, padding: '2.5rem', overflowY: 'auto' }}>
+        <div className="cbt-question-canvas" style={{ flex: 1, padding: '2.5rem', overflowY: 'auto' }}>
           
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
             <span className="badge badge-cyan" style={{ fontSize: '0.85rem' }}>
@@ -403,14 +391,17 @@ export const MockTestEngine = () => {
         </div>
 
         {/* Right Side Question Palette Matrix */}
-        <div style={{
-          width: '320px',
-          background: '#070b18',
-          borderLeft: '1px solid rgba(255,255,255,0.1)',
-          padding: '1.5rem',
-          display: 'flex',
-          flexDirection: 'column'
-        }}>
+        <div 
+          className="cbt-palette-matrix"
+          style={{
+            width: '320px',
+            background: '#070b18',
+            borderLeft: '1px solid rgba(255,255,255,0.1)',
+            padding: '1.5rem',
+            display: 'flex',
+            flexDirection: 'column'
+          }}
+        >
           <h4 style={{ color: '#ffffff', marginBottom: '1rem', fontSize: '0.95rem' }}>Question Palette Matrix</h4>
           
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.6rem', marginBottom: '2rem' }}>

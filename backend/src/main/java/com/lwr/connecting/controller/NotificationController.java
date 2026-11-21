@@ -33,6 +33,15 @@ public class NotificationController {
         return ResponseEntity.ok(notificationRepository.findByUserIdOrderByCreatedAtDesc(user.getId()));
     }
 
+    @GetMapping("/notifications/unread-count")
+    public ResponseEntity<Map<String, Long>> getUnreadCount(Authentication authentication) {
+        if (authentication == null) return ResponseEntity.status(401).build();
+        User user = userRepository.findByEmail(authentication.getName()).orElseThrow();
+        long unread = notificationRepository.findByUserIdOrderByCreatedAtDesc(user.getId())
+                .stream().filter(n -> n.getIsRead() == null || !n.getIsRead()).count();
+        return ResponseEntity.ok(Map.of("unreadCount", unread));
+    }
+
     @PostMapping("/notifications/{id}/read")
     public ResponseEntity<?> markNotificationAsRead(@PathVariable Long id, Authentication authentication) {
         if (authentication == null) return ResponseEntity.status(401).build();
@@ -40,6 +49,18 @@ public class NotificationController {
         notification.setIsRead(true);
         notificationRepository.save(notification);
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/notifications/read-all")
+    public ResponseEntity<?> markAllNotificationsRead(Authentication authentication) {
+        if (authentication == null) return ResponseEntity.status(401).build();
+        User user = userRepository.findByEmail(authentication.getName()).orElseThrow();
+        List<Notification> list = notificationRepository.findByUserIdOrderByCreatedAtDesc(user.getId());
+        for (Notification n : list) {
+            n.setIsRead(true);
+        }
+        notificationRepository.saveAll(list);
+        return ResponseEntity.ok(Map.of("success", true, "markedCount", list.size()));
     }
 
     @GetMapping("/email-preferences")

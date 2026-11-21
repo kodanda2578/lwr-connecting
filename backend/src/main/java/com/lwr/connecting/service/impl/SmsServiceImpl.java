@@ -18,15 +18,19 @@ public class SmsServiceImpl implements SmsService {
     @Value("${sms.enabled:false}")
     private boolean smsEnabled;
 
+    private String maskMobile(String mobile) {
+        if (mobile == null || mobile.length() < 4) return "****";
+        return mobile.substring(0, 2) + "******" + mobile.substring(mobile.length() - 2);
+    }
+
     @Override
     @Async
     public void sendOtpSms(String mobileNumber, String otp, String idempotencyKey) {
+        String masked = maskMobile(mobileNumber);
         if (!smsEnabled || "DEV".equalsIgnoreCase(smsProvider) || "LOG".equalsIgnoreCase(smsProvider)) {
-            logger.info("=========================================================");
-            logger.info("[DEV ONLY] Mobile verification OTP generated for mobile {}: [{}]", mobileNumber, otp);
-            logger.info("=========================================================");
+            logger.info("[SMS DEV MODE] Mobile verification OTP generated for mobile {} (code masked for security)", masked);
         } else {
-            logger.info("[SMS PROVIDER] Dispatched SMS OTP to {}", mobileNumber);
+            logger.info("[SMS PROVIDER] Dispatched SMS OTP to {}", masked);
         }
     }
 }

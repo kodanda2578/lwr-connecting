@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
 @RestController
-@RequestMapping("/api/admin/tests")
+@RequestMapping({"/admin/tests", "/api/admin/tests"})
 @RequiredArgsConstructor
 public class AdminTestManagerController {
 
@@ -60,6 +60,11 @@ public class AdminTestManagerController {
     @PostMapping("/patterns")
     public ResponseEntity<ExamTestPatternDTO> savePattern(@RequestBody ExamTestPatternDTO patternDTO) {
         return ResponseEntity.ok(mockTestService.saveExamTestPattern(patternDTO));
+    }
+
+    @GetMapping("/gemini-status")
+    public ResponseEntity<Map<String, Object>> getGeminiStatus() {
+        return ResponseEntity.ok(aiQuestionService.getGeminiProviderStatus());
     }
 
     @GetMapping("/validations")

@@ -18,12 +18,19 @@ import {
   Send,
   Eye,
   Sparkles,
-  UserCheck
+  UserCheck,
+  MessageSquarePlus,
+  Rocket
 } from 'lucide-react';
 import { COLLEGES_DATA, CUTOFFS_DATA, MOCK_TESTS_DATA } from '../data/sampleData';
+import { buildApiUrl } from '../config/appConfig';
 import AdminQuestionManager from '../components/AdminQuestionManager';
 import AdminCollegeManager from '../components/AdminCollegeManager';
 import AdminTestManager from '../components/AdminTestManager';
+import AdminGuidanceManager from '../components/AdminGuidanceManager';
+import AdminDataImportManager from '../components/AdminDataImportManager';
+import { AdminBetaFeedbackManager } from '../components/AdminBetaFeedbackManager';
+import AdminLaunchOperationsManager from '../components/AdminLaunchOperationsManager';
 
 export const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -114,7 +121,7 @@ export const AdminDashboard = () => {
   const handleSendComposerNotification = async (e) => {
     e.preventDefault();
     try {
-      await fetch('/api/admin/announcements/send', {
+      await fetch(buildApiUrl('/admin/announcements/send'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -170,9 +177,13 @@ export const AdminDashboard = () => {
         {/* Admin Navigation Tabs */}
         <div style={{ display: 'flex', gap: '0.6rem', overflowX: 'auto', paddingBottom: '0.75rem', marginBottom: '2rem' }}>
           {[
+            { id: 'launchOps', label: 'Launch Operations', icon: Rocket },
             { id: 'overview', label: 'Overview', icon: BarChart3 },
+            { id: 'betaFeedback', label: 'Beta Feedback', icon: MessageSquarePlus },
+            { id: 'guidanceRequests', label: 'Student Guidance Requests', icon: Inbox },
+            { id: 'dataImport', label: 'Data Ingestion & Verification', icon: Upload },
             { id: 'examContent', label: 'Question & Exam Manager', icon: BookOpen },
-            { id: 'mentorInbox', label: 'Mentor Inbox', icon: Inbox, badge: mentorRequests.filter(r => r.status === 'OPEN').length },
+            { id: 'mentorInbox', label: 'Legacy Doubt Inbox', icon: HelpCircle },
             { id: 'composer', label: 'Notification Composer', icon: Bell },
             { id: 'colleges', label: 'Colleges & Cutoffs', icon: Building2 },
             { id: 'students', label: 'Students', icon: Users },
@@ -216,9 +227,19 @@ export const AdminDashboard = () => {
           })}
         </div>
 
+        {/* TAB: LAUNCH OPERATIONS */}
+        {activeTab === 'launchOps' && (
+          <AdminLaunchOperationsManager />
+        )}
+
         {/* TAB 0: EXAM CONTENT MANAGER */}
         {activeTab === 'examContent' && (
           <AdminQuestionManager />
+        )}
+
+        {/* TAB: STUDENT GUIDANCE REQUESTS & APPOINTMENT WORKFLOW */}
+        {activeTab === 'guidanceRequests' && (
+          <AdminGuidanceManager />
         )}
 
         {/* TAB 1: OVERVIEW */}
@@ -432,6 +453,16 @@ export const AdminDashboard = () => {
               </div>
             </div>
           </div>
+        )}
+
+        {/* TAB: BETA FEEDBACK */}
+        {activeTab === 'betaFeedback' && (
+          <AdminBetaFeedbackManager />
+        )}
+
+        {/* TAB: DATA INGESTION & VERIFICATION */}
+        {activeTab === 'dataImport' && (
+          <AdminDataImportManager />
         )}
 
         {/* TAB 4: COLLEGES MANAGER */}

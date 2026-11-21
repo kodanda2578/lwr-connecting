@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Optional;
 
 @RestController
-@RequestMapping("/api/admin")
+@RequestMapping({"/admin", "/api/admin"})
 @CrossOrigin(origins = "*")
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminCollegeManagerController {
@@ -57,16 +57,20 @@ public class AdminCollegeManagerController {
         existing.setCode(updated.getCode());
         existing.setName(updated.getName());
         existing.setState(updated.getState());
+        if (updated.getLocation() != null && !updated.getLocation().isBlank()) existing.setLocation(updated.getLocation());
+        if (updated.getStateText() != null && !updated.getStateText().isBlank()) existing.setStateText(updated.getStateText());
         existing.setCity(updated.getCity());
         existing.setDistrict(updated.getDistrict());
         existing.setWebsite(updated.getWebsite());
         existing.setAdmissionAuthority(updated.getAdmissionAuthority());
         existing.setGovernmentStatus(updated.getGovernmentStatus());
         existing.setCollegeType(updated.getCollegeType());
+        if (updated.getTypeCode() != null && !updated.getTypeCode().isBlank()) existing.setTypeCode(updated.getTypeCode());
         existing.setIsAutonomous(updated.getIsAutonomous());
         existing.setActive(updated.getActive());
         existing.setDescription(updated.getDescription());
         existing.setSourceReference(updated.getSourceReference());
+        if (updated.getSource() != null && !updated.getSource().isBlank()) existing.setSource(updated.getSource());
 
         return ResponseEntity.ok(collegeRepository.save(existing));
     }
